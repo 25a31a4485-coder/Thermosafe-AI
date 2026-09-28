@@ -1,0 +1,2601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>THERMOSAFE AI — Industrial Thermal Intelligence</title>
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+<!-- Formal serif font -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700;8..60,800&display=swap" rel="stylesheet">
+
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    /* Blue + White professional palette */
+    --bg-page: #FFFFFF;
+    --bg-section: #F5F8FC;
+    --bg-card: #FFFFFF;
+    --bg-card-alt: #F0F6FC;
+    --border: #D6E2EF;
+    --border-strong: #B8CCE0;
+
+    --navy: #0B2545;          /* headings / nav */
+    --navy-2: #13315C;
+    --blue: #1E5AA8;          /* primary buttons */
+    --blue-hover: #174B8E;
+    --blue-light: #E8F1FB;
+    --cyan: #0891B2;
+    --cyan-light: #E0F7FA;
+
+    --text-primary: #0B2545;
+    --text-secondary: #4A5568;
+    --text-muted: #7A8699;
+
+    /* Event colors (consistent everywhere) */
+    --c-critical: #DC2626;    /* Red — Critical Industrial Fire */
+    --c-high: #EA580C;        /* Orange — High-Risk Thermal */
+    --c-gas: #CA8A04;         /* Yellow — Gas Flare */
+    --c-persistent: #7C3AED;  /* Purple — Persistent Thermal */
+    --c-facility: #2563EB;    /* Blue — Industrial Facility */
+    --c-low: #16A34A;         /* Green — Low Risk / Normal */
+
+    --shadow-sm: 0 1px 2px rgba(11,37,69,0.06);
+    --shadow-md: 0 2px 8px rgba(11,37,69,0.08);
+    --shadow-lg: 0 8px 24px rgba(11,37,69,0.12);
+  }
+
+  html, body {
+    font-family: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+    background: var(--bg-page);
+    color: var(--text-primary);
+    height: 100%;
+    overflow: hidden;
+    max-width: 100%;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button { cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
+
+  /* ============ LAYOUT ============ */
+  #app { display: flex; flex-direction: column; height: 100vh; width: 100vw; }
+
+  /* Top bar */
+  .topbar {
+    height: 60px;
+    background: var(--navy);
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    padding: 0 18px;
+    gap: 14px;
+    flex-shrink: 0;
+    z-index: 100;
+    border-bottom: 3px solid var(--blue);
+    box-shadow: var(--shadow-md);
+  }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 19px; letter-spacing: 0.3px; white-space: nowrap; }
+  .logo-icon {
+    width: 34px; height: 34px;
+    background: linear-gradient(135deg, var(--c-critical), var(--c-high));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  }
+  .logo-text { color: #FFFFFF; }
+  .logo-text span { color: #7DD3FC; }
+
+  .topbar-search { flex: 1; max-width: 420px; position: relative; }
+  .topbar-search input {
+    width: 100%; height: 38px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 8px;
+    padding: 0 12px 0 38px;
+    color: #FFFFFF;
+    font-size: 13px;
+    outline: none;
+    font-family: inherit;
+  }
+  .topbar-search input::placeholder { color: rgba(255,255,255,0.5); }
+  .topbar-search input:focus { border-color: #7DD3FC; background: rgba(255,255,255,0.15); }
+  .topbar-search svg {
+    position: absolute; left: 12px; top: 11px;
+    width: 16px; height: 16px; color: rgba(255,255,255,0.6);
+  }
+
+  .topbar-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  .icon-btn {
+    width: 38px; height: 38px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: #FFFFFF;
+    position: relative;
+    transition: all 0.15s;
+  }
+  .icon-btn:hover { background: rgba(255,255,255,0.2); }
+  .badge-count {
+    position: absolute; top: -4px; right: -4px;
+    background: var(--c-critical);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    min-width: 18px; height: 18px;
+    border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 4px;
+    border: 2px solid var(--navy);
+    font-family: 'Source Serif 4', serif;
+  }
+
+  .demo-pill {
+    background: rgba(202,138,4,0.25);
+    color: #FDE68A;
+    border: 1px solid rgba(202,138,4,0.5);
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+
+  /* Main area */
+  .main-area { flex: 1; display: flex; overflow: hidden; position: relative; }
+
+  /* Sidebar */
+  .sidebar {
+    width: 230px;
+    background: var(--bg-section);
+    border-right: 1px solid var(--border);
+    padding: 14px 10px;
+    display: flex; flex-direction: column; gap: 2px;
+    flex-shrink: 0;
+    overflow-y: auto;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 12px;
+    border-radius: 6px;
+    color: var(--navy-2);
+    font-size: 14px;
+    font-weight: 600;
+    background: none; border: none;
+    width: 100%; text-align: left;
+    transition: all 0.15s;
+    border-left: 3px solid transparent;
+  }
+  .nav-item:hover { background: var(--blue-light); color: var(--navy); }
+  .nav-item.active {
+    background: var(--blue-light);
+    color: var(--blue);
+    border-left: 3px solid var(--blue);
+  }
+  .nav-item svg { width: 17px; height: 17px; flex-shrink: 0; }
+
+  .nav-section-label {
+    font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text-muted);
+    padding: 14px 12px 6px;
+  }
+
+  /* Content */
+  .content {
+    flex: 1; overflow-y: auto; overflow-x: hidden;
+    padding: 18px; position: relative;
+    background: var(--bg-page);
+  }
+
+  /* KPI Cards */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px; margin-bottom: 18px;
+  }
+  .kpi-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    position: relative; overflow: hidden;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: var(--shadow-sm);
+  }
+  .kpi-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  .kpi-card::before {
+    content: ''; position: absolute;
+    top: 0; left: 0; width: 4px; height: 100%;
+  }
+  .kpi-card.critical::before { background: var(--c-critical); }
+  .kpi-card.high::before { background: var(--c-high); }
+  .kpi-card.medium::before { background: var(--c-gas); }
+  .kpi-card.low::before { background: var(--c-low); }
+  .kpi-card.info::before { background: var(--c-facility); }
+  .kpi-card.persistent::before { background: var(--c-persistent); }
+
+  .kpi-label {
+    font-size: 11px; color: var(--text-secondary);
+    font-weight: 600; margin-bottom: 8px;
+    text-transform: uppercase; letter-spacing: 0.6px;
+  }
+  .kpi-value {
+    font-size: 28px; font-weight: 800;
+    color: var(--navy); line-height: 1;
+  }
+  .kpi-sub { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+
+  /* Grid layouts */
+  .dashboard-grid { display: grid; grid-template-columns: 1fr 340px; gap: 16px; }
+
+  .map-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+    min-height: 400px; height: 100%;
+    box-shadow: var(--shadow-sm);
+  }
+  #map { width: 100%; height: 100%; min-height: 400px; background: #F8FAFC; }
+
+  .right-panel { display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    box-shadow: var(--shadow-sm);
+  }
+  .card-title {
+    font-size: 12px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--navy);
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .card-title svg { width: 15px; height: 15px; color: var(--blue); }
+
+  /* Risk badges */
+  .risk-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px; border-radius: 4px;
+    font-size: 10px; font-weight: 800;
+    letter-spacing: 0.6px; text-transform: uppercase;
+  }
+  .risk-critical { background: #FEE2E2; color: #991B1B; border: 1px solid #FCA5A5; }
+  .risk-high { background: #FFEDD5; color: #9A3412; border: 1px solid #FDBA74; }
+  .risk-gas { background: #FEF3C7; color: #854D0E; border: 1px solid #FDE047; }
+  .risk-persistent { background: #EDE9FE; color: #5B21B6; border: 1px solid #C4B5FD; }
+  .risk-facility { background: #DBEAFE; color: #1E40AF; border: 1px solid #93C5FD; }
+  .risk-low { background: #DCFCE7; color: #166534; border: 1px solid #86EFAC; }
+
+  /* Progress bar */
+  .progress-track {
+    height: 8px; background: var(--bg-section);
+    border: 1px solid var(--border);
+    border-radius: 4px; overflow: hidden; margin: 6px 0;
+  }
+  .progress-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+
+  /* Detail rows */
+  .detail-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-label { color: var(--text-secondary); font-weight: 500; }
+  .detail-value { color: var(--navy); font-weight: 700; text-align: right; }
+
+  /* Buttons */
+  .btn {
+    padding: 9px 16px; border-radius: 6px;
+    font-size: 13px; font-weight: 700;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+    display: inline-flex; align-items: center; gap: 6px;
+    justify-content: center; min-height: 38px;
+    font-family: inherit;
+  }
+  .btn-primary { background: var(--blue); color: #FFFFFF; }
+  .btn-primary:hover { background: var(--blue-hover); }
+  .btn-outline { background: #FFFFFF; color: var(--blue); border-color: var(--border-strong); }
+  .btn-outline:hover { border-color: var(--blue); background: var(--blue-light); }
+  .btn-danger { background: var(--c-critical); color: #FFFFFF; }
+  .btn-danger:hover { background: #B91C1C; }
+  .btn-warning { background: var(--c-high); color: #FFFFFF; }
+  .btn-warning:hover { background: #C2410C; }
+  .btn-success { background: var(--c-low); color: #FFFFFF; }
+  .btn-success:hover { background: #15803D; }
+  .btn-purple { background: var(--c-persistent); color: #FFFFFF; }
+  .btn-purple:hover { background: #6D28D9; }
+  .btn-sm { padding: 6px 12px; font-size: 12px; min-height: 32px; }
+  .btn-block { width: 100%; }
+  .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  /* Live feed */
+  .feed-item {
+    display: flex; gap: 10px; padding: 8px 0;
+    font-size: 12px; border-bottom: 1px solid var(--border);
+  }
+  .feed-time { color: var(--text-muted); font-family: 'Courier New', monospace; flex-shrink: 0; font-size: 11px; padding-top: 1px; font-weight: 600; }
+  .feed-text { color: var(--text-secondary); }
+
+  /* Bottom sheet (mobile) */
+  .bottom-sheet {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--bg-card);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -8px 32px rgba(11,37,69,0.2);
+    z-index: 1000; max-height: 75vh;
+    overflow-y: auto;
+    transform: translateY(100%);
+    transition: transform 0.3s ease;
+    border-top: 3px solid var(--blue);
+  }
+  .bottom-sheet.open { transform: translateY(0); }
+  .sheet-handle { width: 40px; height: 4px; background: var(--border-strong); border-radius: 2px; margin: 10px auto; }
+  .sheet-content { padding: 0 18px 18px; }
+
+  /* Mobile nav */
+  .mobile-nav {
+    display: none; background: #FFFFFF;
+    border-top: 1px solid var(--border);
+    height: 60px; flex-shrink: 0;
+    box-shadow: 0 -2px 8px rgba(11,37,69,0.06);
+  }
+  .mobile-nav-inner { display: flex; height: 100%; }
+  .mobile-nav-item {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 3px;
+    background: none; border: none;
+    color: var(--text-muted); font-size: 10px; font-weight: 700;
+  }
+  .mobile-nav-item.active { color: var(--blue); }
+  .mobile-nav-item svg { width: 20px; height: 20px; }
+
+  /* Notification Drawer */
+  .drawer-backdrop {
+    position: fixed; inset: 0; background: rgba(11,37,69,0.35);
+    z-index: 1500; opacity: 0; pointer-events: none;
+    transition: opacity 0.25s;
+  }
+  .drawer-backdrop.open { opacity: 1; pointer-events: auto; }
+
+  .notification-drawer {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: 420px; max-width: 92vw;
+    background: #FFFFFF;
+    z-index: 1600;
+    box-shadow: -8px 0 32px rgba(11,37,69,0.2);
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    display: flex; flex-direction: column;
+    border-left: 1px solid var(--border);
+  }
+  .notification-drawer.open { transform: translateX(0); }
+
+  .drawer-header {
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--bg-section);
+  }
+  .drawer-title { font-size: 16px; font-weight: 800; color: var(--navy); }
+  .drawer-actions { display: flex; gap: 8px; align-items: center; }
+  .drawer-body { flex: 1; overflow-y: auto; padding: 12px; }
+  .notif-item {
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--blue);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+    transition: all 0.15s;
+    position: relative;
+  }
+  .notif-item.unread { background: var(--blue-light); }
+  .notif-item.critical { border-left-color: var(--c-critical); }
+  .notif-item.high { border-left-color: var(--c-high); }
+  .notif-item.gas { border-left-color: var(--c-gas); }
+  .notif-item.persistent { border-left-color: var(--c-persistent); }
+  .notif-item.low { border-left-color: var(--c-low); }
+  .notif-title { font-weight: 800; font-size: 13px; color: var(--navy); margin-bottom: 4px; }
+  .notif-msg { font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 6px; }
+  .notif-meta { display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: var(--text-muted); margin-top: 8px; }
+  .notif-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+
+  /* Toast */
+  #toast-container {
+    position: fixed; top: 76px; right: 18px;
+    z-index: 2000; display: flex; flex-direction: column;
+    gap: 10px; max-width: 360px;
+  }
+  .toast {
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-left: 5px solid var(--blue);
+    border-radius: 8px;
+    padding: 14px 16px;
+    box-shadow: var(--shadow-lg);
+    font-size: 13px;
+    animation: slideIn 0.35s ease;
+  }
+  .toast.critical { border-left-color: var(--c-critical); }
+  .toast.high { border-left-color: var(--c-high); }
+  .toast.gas { border-left-color: var(--c-gas); }
+  .toast.persistent { border-left-color: var(--c-persistent); }
+  .toast.low { border-left-color: var(--c-low); }
+  .toast-title { font-weight: 800; margin-bottom: 4px; color: var(--navy); font-size: 13px; }
+  .toast-msg { color: var(--text-secondary); font-size: 12px; line-height: 1.4; margin-bottom: 8px; }
+  .toast-actions { display: flex; gap: 6px; }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(40px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  /* Custom marker pulse */
+  .pulse-marker { animation: pulseRing 2s infinite; border-radius: 50%; }
+  @keyframes pulseRing {
+    0% { box-shadow: 0 0 0 0 rgba(220,38,38,0.7); }
+    70% { box-shadow: 0 0 0 16px rgba(220,38,38,0); }
+    100% { box-shadow: 0 0 0 0 rgba(220,38,38,0); }
+  }
+  .pulse-marker-orange { animation: pulseRingOrange 2s infinite; border-radius: 50%; }
+  @keyframes pulseRingOrange {
+    0% { box-shadow: 0 0 0 0 rgba(234,88,12,0.7); }
+    70% { box-shadow: 0 0 0 14px rgba(234,88,12,0); }
+    100% { box-shadow: 0 0 0 0 rgba(234,88,12,0); }
+  }
+
+  /* Legend */
+  .legend {
+    position: absolute; bottom: 14px; left: 14px;
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 11px;
+    z-index: 500;
+    box-shadow: var(--shadow-md);
+    max-width: 230px;
+  }
+  .legend-title {
+    font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.8px; color: var(--navy);
+    margin-bottom: 8px; font-size: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 0; color: var(--text-primary);
+    font-size: 11px; font-weight: 500;
+  }
+  .legend-dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    flex-shrink: 0; border: 2px solid #FFFFFF;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.15);
+  }
+  .legend-square {
+    width: 12px; height: 12px; border-radius: 2px;
+    flex-shrink: 0; border: 2px solid #FFFFFF;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.15);
+  }
+
+  /* Chart bars */
+  .chart-container { padding: 8px 0; }
+  .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 12px; }
+  .bar-label { width: 110px; color: var(--text-secondary); flex-shrink: 0; text-align: right; font-weight: 500; }
+  .bar-track { flex: 1; height: 20px; background: var(--bg-section); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; position: relative; }
+  .bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; font-size: 11px; font-weight: 800; color: white; }
+
+  /* Leaflet overrides for white theme */
+  .leaflet-popup-content-wrapper {
+    background: #FFFFFF !important;
+    color: var(--navy) !important;
+    border-radius: 8px !important;
+    border: 1px solid var(--border) !important;
+    box-shadow: 0 8px 24px rgba(11,37,69,0.18) !important;
+  }
+  .leaflet-popup-tip { background: #FFFFFF !important; }
+  .leaflet-popup-content { margin: 14px 16px !important; font-size: 13px !important; font-family: 'Source Serif 4', Georgia, serif !important; }
+  .leaflet-control-zoom a {
+    background: #FFFFFF !important;
+    color: var(--navy) !important;
+    border-color: var(--border) !important;
+    font-weight: bold !important;
+  }
+  .leaflet-control-zoom a:hover { background: var(--blue-light) !important; color: var(--blue) !important; }
+  .leaflet-control-attribution {
+    background: rgba(255,255,255,0.85) !important;
+    color: var(--text-muted) !important;
+    font-size: 9px !important;
+  }
+  .leaflet-bar { box-shadow: 0 2px 8px rgba(11,37,69,0.15) !important; border: none !important; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg-section); }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+  /* Responsive */
+  @media (max-width: 1024px) {
+    .dashboard-grid { grid-template-columns: 1fr 300px; }
+  }
+  @media (max-width: 900px) {
+    .sidebar { display: none; }
+    .dashboard-grid { grid-template-columns: 1fr; }
+    .right-panel { display: none; }
+    .mobile-nav { display: block; }
+    .topbar-search { max-width: 200px; }
+    .logo-text { font-size: 15px; }
+    .content { padding: 12px; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .demo-pill { display: none; }
+    .notification-drawer { width: 100%; }
+    .legend { max-width: 180px; padding: 8px 10px; font-size: 10px; bottom: 8px; left: 8px; }
+    .legend-item { font-size: 10px; padding: 3px 0; }
+  }
+  @media (max-width: 560px) {
+    .topbar-search { display: none; }
+    .kpi-value { font-size: 22px; }
+    .kpi-card { padding: 12px; }
+    .logo-text { font-size: 14px; }
+    .topbar { padding: 0 12px; gap: 8px; }
+    #toast-container { top: 68px; right: 8px; left: 8px; max-width: none; }
+  }
+
+  .hidden { display: none !important; }
+  .text-muted { color: var(--text-muted); }
+  .font-mono { font-family: 'Courier New', monospace; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .mb-3 { margin-bottom: 12px; }
+  .mt-3 { margin-top: 12px; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="logo">
+      <div class="logo-icon">🔥</div>
+      <div class="logo-text">THERMO<span>SAFE</span> AI</div>
+    </div>
+    <div class="topbar-search">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      <input type="text" id="globalSearch" placeholder="Search event ID, location, facility..." />
+    </div>
+    <div class="topbar-actions">
+      <span class="demo-pill" id="backendPill">● DEMO DATA</span>
+      <button class="icon-btn" id="notifBtn" title="Notifications" aria-label="Open notifications">
+        <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+        </svg>
+        <span class="badge-count" id="notifCount">8</span>
+      </button>
+      <button class="icon-btn" id="profileBtn" title="Profile" aria-label="Profile" onclick="window.__thermosafe.openAuthModal()">
+        <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="12" cy="8" r="4"/><path d="M4 21v-2a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v2"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main-area">
+    <aside class="sidebar" id="sidebar">
+      <div class="nav-section-label">Command</div>
+      <button class="nav-item active" data-page="dashboard">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+        Dashboard
+      </button>
+      <button class="nav-item" data-page="map">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+        Live Map
+      </button>
+      <button class="nav-item" data-page="incidents">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Incidents
+      </button>
+      <button class="nav-item" data-page="analytics">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Analytics
+      </button>
+      <button class="nav-item" data-page="alerts">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        Alerts
+      </button>
+      <button class="nav-item" data-page="reports">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Reports
+      </button>
+      <div class="nav-section-label">System</div>
+      <button class="nav-item" data-page="settings">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </button>
+    </aside>
+
+    <div class="content" id="content"></div>
+  </div>
+
+  <nav class="mobile-nav">
+    <div class="mobile-nav-inner">
+      <button class="mobile-nav-item active" data-page="dashboard">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Home
+      </button>
+      <button class="mobile-nav-item" data-page="map">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+        Map
+      </button>
+      <button class="mobile-nav-item" data-page="alerts">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        Alerts
+      </button>
+      <button class="mobile-nav-item" data-page="analytics">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Analytics
+      </button>
+      <button class="mobile-nav-item" data-page="settings" onclick="window.__thermosafe.openAuthModal()">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v2"/></svg>
+        Profile
+      </button>
+    </div>
+  </nav>
+</div>
+
+<!-- Bottom sheet (mobile) -->
+<div class="bottom-sheet" id="bottomSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-content" id="sheetContent"></div>
+</div>
+
+<!-- Notification drawer -->
+<div class="drawer-backdrop" id="drawerBackdrop"></div>
+<aside class="notification-drawer" id="notificationDrawer" aria-label="Notifications">
+  <div class="drawer-header">
+    <div class="drawer-title">Notifications</div>
+    <div class="drawer-actions">
+      <button class="btn btn-outline btn-sm" onclick="window.__thermosafe.markAllRead()">Mark all read</button>
+      <button class="btn btn-outline btn-sm" onclick="window.__thermosafe.clearNotifications()">Clear</button>
+      <button class="icon-btn" style="background:var(--bg-section);color:var(--navy);border-color:var(--border);" onclick="window.__thermosafe.closeDrawer()" aria-label="Close">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+</aside>
+
+<div id="toast-container"></div>
+
+<!-- Auth Modal -->
+<div class="drawer-backdrop" id="authBackdrop" style="display:none;z-index:9999;" onclick="window.__thermosafe.closeAuthModal()"></div>
+<div id="authModal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:92%;max-width:440px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-lg);z-index:10000;padding:24px;font-family:inherit;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <div style="font-weight:800;font-size:18px;color:var(--navy);display:flex;align-items:center;gap:8px;">
+      <span style="font-size:20px;">🛡️</span> <span id="authModalTitle">Security Authentication</span>
+    </div>
+    <button class="icon-btn" style="background:var(--bg-section);color:var(--navy);border-color:var(--border);" onclick="window.__thermosafe.closeAuthModal()" aria-label="Close">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div id="authModalBody"></div>
+</div>
+
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ============================================================
+   THERMOSAFE AI — SIH26162 — NTRO
+   Blue/White GIS Intelligence Platform
+   Full Integration: Live FastAPI Backend + Graceful Demo Fallback
+   ============================================================ */
+
+(function () {
+  'use strict';
+
+  /* ========== EVENT COLOR SYSTEM (consistent everywhere) ========== */
+  const EVENT_COLORS = {
+    'Critical Industrial Fire':   { hex:'#DC2626', cls:'risk-critical',   clsShort:'critical'   },
+    'Industrial Fire':            { hex:'#DC2626', cls:'risk-critical',   clsShort:'critical'   },
+    'High-Risk Thermal Event':    { hex:'#EA580C', cls:'risk-high',       clsShort:'high'       },
+    'High-Risk Thermal':          { hex:'#EA580C', cls:'risk-high',       clsShort:'high'       },
+    'Gas Flare':                  { hex:'#CA8A04', cls:'risk-gas',        clsShort:'gas'        },
+    'Persistent Thermal Source':  { hex:'#7C3AED', cls:'risk-persistent', clsShort:'persistent' },
+    'Low-Risk Thermal Activity':  { hex:'#16A34A', cls:'risk-low',        clsShort:'low'        },
+    'Low Risk':                   { hex:'#16A34A', cls:'risk-low',        clsShort:'low'        },
+    'Industrial Facility':        { hex:'#2563EB', cls:'risk-facility',   clsShort:'facility'   },
+    'Agricultural Burning':       { hex:'#16A34A', cls:'risk-low',        clsShort:'low'        },
+    'Mining Activity':            { hex:'#CA8A04', cls:'risk-gas',        clsShort:'gas'        },
+    'Wildfire':                   { hex:'#EA580C', cls:'risk-high',       clsShort:'high'       },
+    'Thermal Power Activity':     { hex:'#EA580C', cls:'risk-high',       clsShort:'high'       },
+    'Unknown':                    { hex:'#7A8699', cls:'risk-low',        clsShort:'low'        }
+  };
+
+  const RISK_COLORS = {
+    CRITICAL: '#DC2626',
+    HIGH: '#EA580C',
+    MEDIUM: '#CA8A04',
+    LOW: '#16A34A',
+    INFORMATIONAL: '#2563EB',
+    PERSISTENT: '#7C3AED'
+  };
+
+  function getEventColor(event) {
+    if (!event) return EVENT_COLORS['Low-Risk Thermal Activity'];
+    if (EVENT_COLORS[event.classification]) return EVENT_COLORS[event.classification];
+    const cl = (event.classification || '').toLowerCase();
+    if (cl.includes('critical') || (cl.includes('fire') && event.risk === 'CRITICAL')) return EVENT_COLORS['Critical Industrial Fire'];
+    if (cl.includes('fire')) return EVENT_COLORS['Industrial Fire'];
+    if (cl.includes('high')) return EVENT_COLORS['High-Risk Thermal Event'];
+    if (cl.includes('flare')) return EVENT_COLORS['Gas Flare'];
+    if (cl.includes('persistent')) return EVENT_COLORS['Persistent Thermal Source'];
+    if (cl.includes('low') || cl.includes('normal')) return EVENT_COLORS['Low-Risk Thermal Activity'];
+    if (event.risk === 'CRITICAL') return EVENT_COLORS['Critical Industrial Fire'];
+    if (event.risk === 'HIGH') return EVENT_COLORS['High-Risk Thermal Event'];
+    if (event.risk === 'MEDIUM') return EVENT_COLORS['Gas Flare'];
+    if (event.risk === 'LOW') return EVENT_COLORS['Low-Risk Thermal Activity'];
+    return EVENT_COLORS['Unknown'];
+  }
+
+  function getRiskColor(risk) {
+    const r = (risk || 'LOW').toUpperCase();
+    return RISK_COLORS[r] || RISK_COLORS.LOW;
+  }
+
+  function riskBadge(risk) {
+    const r = (risk || 'LOW').toUpperCase();
+    const cls = {
+      CRITICAL: 'risk-critical',
+      HIGH: 'risk-high',
+      MEDIUM: 'risk-gas',
+      LOW: 'risk-low',
+      INFORMATIONAL: 'risk-facility',
+      PERSISTENT: 'risk-persistent'
+    }[r] || 'risk-low';
+    return `<span class="risk-badge ${cls}">${r}</span>`;
+  }
+
+  function classBadge(classification) {
+    const c = EVENT_COLORS[classification] || EVENT_COLORS['Unknown'];
+    return `<span class="risk-badge ${c.cls}">${classification}</span>`;
+  }
+
+  /* ========== DEMO DATA FALLBACK ========== */
+  const THERMAL_EVENTS = [
+    { id:'TH-2026-00421', lat:17.6868, lng:83.2185, city:'Visakhapatnam', state:'Andhra Pradesh', classification:'Industrial Fire', risk:'CRITICAL', score:92, confidence:94, intensity:'HIGH', persistence:'3.7 hours', facility:'Petrochemical Plant', landcover:'Industrial', source:'NASA FIRMS', detected:'2026-02-14 10:32', explanation:'High thermal persistence in heavy industrial zone with adjacent hazardous chemical storage.' },
+    { id:'TH-2026-00422', lat:19.0760, lng:72.8777, city:'Mumbai', state:'Maharashtra', classification:'Gas Flare', risk:'HIGH', score:78, confidence:88, intensity:'MEDIUM', persistence:'2.1 hours', facility:'Oil Refinery', landcover:'Industrial', source:'NASA FIRMS', detected:'2026-02-14 09:15', explanation:'Recurring thermal radiance characteristic of regulated elevated flare stacks.' },
+    { id:'TH-2026-00423', lat:22.3072, lng:73.1812, city:'Vadodara', state:'Gujarat', classification:'Industrial Fire', risk:'CRITICAL', score:95, confidence:96, intensity:'HIGH', persistence:'5.2 hours', facility:'Chemical Plant', landcover:'Industrial', source:'NASA FIRMS', detected:'2026-02-14 08:47', explanation:'High severity industrial thermal anomaly with rapid spatial expansion signature.' },
+    { id:'TH-2026-00424', lat:20.2961, lng:85.8245, city:'Bhubaneswar', state:'Odisha', classification:'Agricultural Burning', risk:'LOW', score:55, confidence:72, intensity:'MEDIUM', persistence:'0.8 hours', facility:null, landcover:'Agricultural', source:'Satellite', detected:'2026-02-14 11:05', explanation:'Transient seasonal crop residue clearing signature.' },
+    { id:'TH-2026-00425', lat:23.3441, lng:85.3096, city:'Ranchi', state:'Jharkhand', classification:'Mining Activity', risk:'MEDIUM', score:62, confidence:81, intensity:'MEDIUM', persistence:'2.5 hours', facility:'Mining Site', landcover:'Barren', source:'NASA FIRMS', detected:'2026-02-14 07:22', explanation:'Surface thermal emission matching active overburden mining equipment.' }
+  ];
+
+  const FACILITIES = [
+    { id:'FAC-001', name:'Visakhapatnam Petrochemical Complex', lat:17.6800, lng:83.2100, type:'Petrochemical Plant', capacity:'High', operator:'HPCL (DEMO)', address:'Industrial Area, Visakhapatnam, Andhra Pradesh' },
+    { id:'FAC-002', name:'Mumbai Refinery', lat:19.0700, lng:72.8700, type:'Oil Refinery', capacity:'Very High', operator:'BPCL (DEMO)', address:'Mahul, Chembur, Mumbai, Maharashtra' },
+    { id:'FAC-003', name:'Vadodara Chemical Works', lat:22.3100, lng:73.1800, type:'Chemical Plant', capacity:'High', operator:'GSFC (DEMO)', address:'Fertilizernagar, Vadodara, Gujarat' },
+    { id:'FAC-004', name:'Chennai Thermal Power Station', lat:13.0800, lng:80.2700, type:'Thermal Power Plant', capacity:'High', operator:'TANGEDCO (DEMO)', address:'Ennore Express Rd, Chennai, Tamil Nadu' },
+    { id:'FAC-005', name:'Jamnagar Petrochemical Complex', lat:22.3039, lng:70.8022, type:'Refinery & Petrochemicals', capacity:'Critical', operator:'Reliance Petroleum Ltd. (DEMO)', address:'Sector 4, Refinery Corridor, Jamnagar, Gujarat' }
+  ];
+
+  const INITIAL_NOTIFICATIONS = [
+    { id:'NT-001', level:'critical', title:'Critical Industrial Fire Detected', msg:'Industrial Fire detected near Visakhapatnam Industrial Zone. Risk: CRITICAL. AI Confidence: 93%.', eventId:'TH-2026-00421', time:'10:42 AM', unread:true, ts: Date.now() - 5*60*1000 },
+    { id:'NT-002', level:'high', title:'High-Risk Thermal Event Detected', msg:'Industrial Fire near Vadodara Chemical Plant. Risk: HIGH. AI Confidence: 96%.', eventId:'TH-2026-00423', time:'08:47 AM', unread:true, ts: Date.now() - 12*60*1000 },
+    { id:'NT-003', level:'persistent', title:'Persistent Thermal Source Identified', msg:'Persistent thermal activity detected near Surat LNG Terminal for 6.0 hours.', eventId:'TH-2026-00433', time:'05:30 AM', unread:true, ts: Date.now() - 25*60*1000 },
+    { id:'NT-004', level:'gas', title:'Gas Flare Detected', msg:'Gas flare detected near Mumbai Refinery. Risk: HIGH.', eventId:'TH-2026-00422', time:'09:15 AM', unread:false, ts: Date.now() - 60*60*1000 }
+  ];
+
+  const LIVE_FEED = [
+    { time:'10:42:31', text:'Critical thermal anomaly detected — Jamnagar Complex' },
+    { time:'10:40:18', text:'AI classified Industrial Fire — Confidence 98%' },
+    { time:'10:37:12', text:'Persistent hotspot detected — Dahej SEZ Zone' },
+    { time:'10:35:44', text:'Risk assessment calculated — Score 96.5' },
+    { time:'10:32:09', text:'Satellite telemetry synchronized — 5 active events' },
+    { time:'10:28:51', text:'Emergency alert generated — Jamnagar Petrochemical' }
+  ];
+
+  /* ========== DYNAMIC WORKING ARRAYS ========== */
+  let currentEvents = [...THERMAL_EVENTS];
+  let currentFacilities = [...FACILITIES];
+
+  /* ========== STATE ========== */
+  const state = {
+    currentPage: 'dashboard',
+    selectedEvent: null,
+    map: null,
+    thermalLayer: null,
+    facilityLayer: null,
+    heatLayer: null,
+    markers: {},
+    simCounter: 500,
+    notifications: JSON.parse(JSON.stringify(INITIAL_NOTIFICATIONS)),
+    browserNotifPermission: 'default',
+    showHeatmap: false,
+    showFacilities: true,
+    heatmapData: [],
+    currentUser: null,
+    authToken: localStorage.getItem('thermo_jwt_token') || null,
+    isLiveBackend: false,
+    backendAnalytics: null,
+    backendReports: []
+  };
+
+  /* ========== BACKEND API CLIENT ========== */
+  const API_BASE_URL = window.VITE_API_BASE_URL || (typeof process !== 'undefined' && process.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
+
+  const apiClient = {
+    async request(endpoint, options = {}) {
+      const url = `${API_BASE_URL}${endpoint}`;
+      const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+      const token = localStorage.getItem('thermo_jwt_token');
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const resp = await fetch(url, { ...options, headers });
+      if (!resp.ok) {
+        let errMsg = `Request failed: ${resp.status}`;
+        try {
+          const errData = await resp.json();
+          if (Array.isArray(errData.detail)) {
+            errMsg = errData.detail.map(d => d.msg || JSON.stringify(d)).join('; ');
+          } else if (typeof errData.detail === 'string') {
+            errMsg = errData.detail;
+          } else if (errData.message) {
+            errMsg = errData.message;
+          }
+        } catch (_) {}
+        throw new Error(errMsg);
+      }
+      const cType = resp.headers.get('content-type') || '';
+      if (cType.includes('application/json')) {
+        return await resp.json();
+      }
+      return await resp.text();
+    },
+
+    async checkHealth() {
+      try {
+        const data = await this.request('/api/health');
+        return data && data.status === 'ok';
+      } catch (e) {
+        return false;
+      }
+    },
+
+    async login(email, password) {
+      return await this.request('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password })
+      });
+    },
+
+    async signup(fullName, email, password, role = 'analyst') {
+      return await this.request('/api/auth/signup', {
+        method: 'POST',
+        body: JSON.stringify({ full_name: fullName, email, password, role })
+      });
+    },
+
+    async getCurrentUser() {
+      return await this.request('/api/auth/me');
+    },
+
+    async getThermalEvents(pageSize = 100) {
+      return await this.request(`/api/thermal-events?page_size=${pageSize}`);
+    },
+
+    async getFacilities(pageSize = 100) {
+      return await this.request(`/api/facilities?page_size=${pageSize}`);
+    },
+
+    async getAlerts(pageSize = 50) {
+      return await this.request(`/api/alerts?page_size=${pageSize}`);
+    },
+
+    async getUnreadAlerts() {
+      return await this.request('/api/alerts/unread');
+    },
+
+    async markAlertRead(alertId) {
+      return await this.request(`/api/alerts/${alertId}/read`, { method: 'PUT' });
+    },
+
+    async getAnalyticsSummary() {
+      return await this.request('/api/analytics/summary');
+    },
+
+    async getRiskDistribution() {
+      return await this.request('/api/analytics/risk-distribution');
+    },
+
+    async getEventTypes() {
+      return await this.request('/api/analytics/event-types');
+    },
+
+    async getTimeSeries() {
+      return await this.request('/api/analytics/time-series');
+    },
+
+    async getReports(pageSize = 20) {
+      return await this.request(`/api/reports?page_size=${pageSize}`);
+    },
+
+    async createReport(payload) {
+      return await this.request('/api/reports', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
+
+    async exportReportCsv(reportId) {
+      return await this.request(`/api/reports/${reportId}/export?format=csv`);
+    },
+
+    async classifyThermal(payload) {
+      return await this.request('/api/ai/classify', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
+
+    async analyzeRisk(payload) {
+      return await this.request('/api/risk/analyze', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    }
+  };
+
+  /* ========== BACKEND TO FRONTEND DATA MAPPERS ========== */
+  function mapBackendEvent(e) {
+    const pUpper = (e.risk_priority || 'LOW').toUpperCase();
+    const eventType = e.event_type || 'Industrial Fire';
+    const classification = e.event_type || 'Industrial Fire';
+
+    let city = 'Industrial Corridor';
+    let stateName = 'India';
+    if (e.facility && e.facility.address) {
+      const parts = e.facility.address.split(',').map(p => p.trim());
+      if (parts.length >= 3) {
+        city = parts[parts.length - 3] || parts[0];
+        stateName = parts[parts.length - 2] || 'India';
+      } else {
+        city = parts[0];
+        stateName = parts[1] || 'India';
+      }
+    }
+
+    const detectedStr = e.detected_at ? new Date(e.detected_at).toLocaleString() : 'Recent';
+    const explanation = (e.classifications && e.classifications[0]?.explanation) ||
+                        (e.risk_assessments && e.risk_assessments[0]?.explanation) ||
+                        'Prototype multi-factor thermal telemetry risk analysis.';
+
+    let factors = [
+      { label:'Industrial proximity', pct:35 },
+      { label:'Thermal signature', pct:30 },
+      { label:'Persistence', pct:20 },
+      { label:'Historical pattern', pct:10 },
+      { label:'Land cover', pct:5 }
+    ];
+
+    if (e.risk_assessments && e.risk_assessments[0]) {
+      const ra = e.risk_assessments[0];
+      factors = [
+        { label:'Thermal intensity factor', pct: Math.round((ra.thermal_factor || 0.35) * 100) },
+        { label:'Persistence factor', pct: Math.round((ra.persistence_factor || 0.25) * 100) },
+        { label:'Industrial proximity', pct: Math.round((ra.industrial_proximity_factor || 0.25) * 100) },
+        { label:'Historical factor', pct: Math.round((ra.historical_factor || 0.1) * 100) },
+        { label:'Population proximity', pct: Math.round((ra.population_proximity_factor || 0.05) * 100) }
+      ];
+    }
+
+    const numConf = Number(e.confidence || 0.9);
+    const confPct = Math.round(numConf <= 1 ? numConf * 100 : numConf);
+
+    return {
+      id: e.event_id || `TH-${e.id}`,
+      dbId: e.id,
+      lat: Number(e.latitude),
+      lng: Number(e.longitude),
+      city: city,
+      state: stateName,
+      classification: classification,
+      eventType: eventType,
+      risk: pUpper,
+      score: Math.round(Number(e.risk_score || 0)),
+      confidence: confPct,
+      intensity: e.thermal_intensity || 'HIGH',
+      persistence: e.persistence || 'Active',
+      facility: e.facility ? e.facility.name : (e.facility_name || null),
+      facilityOperator: e.facility ? e.facility.operator : null,
+      landcover: e.land_cover || 'Industrial Area',
+      source: e.data_source || 'NASA FIRMS',
+      detected: detectedStr,
+      explanation: explanation,
+      factors: factors,
+      raw: e
+    };
+  }
+
+  function mapBackendFacility(f) {
+    return {
+      id: `FAC-${String(f.id).padStart(3, '0')}`,
+      dbId: f.id,
+      name: f.name,
+      lat: Number(f.latitude),
+      lng: Number(f.longitude),
+      type: f.industry_type || 'Industrial Processing',
+      capacity: f.risk_level || 'Medium',
+      operator: f.operator || 'National Consortium',
+      address: f.address || '',
+      raw: f
+    };
+  }
+
+  function mapBackendAlert(a) {
+    const rawSev = (a.severity || a.risk_priority || 'low').toLowerCase();
+    const level = rawSev.includes('crit') ? 'critical' : rawSev.includes('high') ? 'high' : 'low';
+    const evId = a.event ? a.event.event_id : (a.event_id ? `DEMO-EVT-${a.event_id}` : 'TH-2026-00421');
+    return {
+      id: `ALT-${a.alert_id || a.id}`,
+      dbId: a.id,
+      level: level,
+      title: a.title || 'Thermal Alert',
+      msg: a.message || 'Thermal risk detected near monitored industrial zone.',
+      eventId: evId,
+      time: a.created_at ? new Date(a.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
+      unread: !a.is_read,
+      ts: a.created_at ? new Date(a.created_at).getTime() : Date.now(),
+      raw: a
+    };
+  }
+
+  /* ========== UTILS ========== */
+  function getEventById(id) {
+    return currentEvents.find(e => e.id === id || String(e.id) === String(id) || String(e.dbId) === String(id));
+  }
+
+  function timeAgo(ts) {
+    const s = Math.floor((Date.now() - ts) / 1000);
+    if (s < 60) return s + 's ago';
+    if (s < 3600) return Math.floor(s/60) + 'm ago';
+    if (s < 86400) return Math.floor(s/3600) + 'h ago';
+    return Math.floor(s/86400) + 'd ago';
+  }
+
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  /* ========== TOASTS ========== */
+  function showToast(title, msg, level, eventId) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = 'toast ' + (level || '').toLowerCase();
+    toast.innerHTML = `
+      <div class="toast-title">${escapeHtml(title)}</div>
+      <div class="toast-msg">${escapeHtml(msg)}</div>
+      <div class="toast-actions">
+        ${eventId ? `<button class="btn btn-primary btn-sm" onclick="window.__thermosafe.selectEvent('${eventId}')">View Event</button>` : ''}
+        <button class="btn btn-outline btn-sm" onclick="this.closest('.toast').remove()">Dismiss</button>
+      </div>
+    `;
+    container.appendChild(toast);
+    setTimeout(() => {
+      if (!toast.parentNode) return;
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateX(40px)';
+      toast.style.transition = 'all 0.35s';
+      setTimeout(() => toast.remove(), 350);
+    }, 6500);
+  }
+
+  /* ========== NOTIFICATIONS & DRAWER ========== */
+  function updateNotifBadge() {
+    const unread = state.notifications.filter(n => n.unread).length;
+    const badge = document.getElementById('notifCount');
+    if (badge) {
+      badge.textContent = unread;
+      badge.style.display = unread > 0 ? 'flex' : 'none';
+    }
+  }
+
+  function renderDrawer() {
+    const body = document.getElementById('drawerBody');
+    if (!body) return;
+
+    const unread = state.notifications.filter(n => n.unread);
+    const read = state.notifications.filter(n => !n.unread);
+
+    function notifHtml(n) {
+      const btnLabel = n.level === 'critical' ? 'View Event' : 'View on Map';
+      return `
+        <div class="notif-item ${n.level} ${n.unread ? 'unread' : ''}">
+          <div class="notif-title">${escapeHtml(n.title)}</div>
+          <div class="notif-msg">${escapeHtml(n.msg)}</div>
+          <div class="notif-meta">
+            <span>${escapeHtml(n.time)}</span>
+            <span>${timeAgo(n.ts)}</span>
+          </div>
+          <div class="notif-actions">
+            <button class="btn btn-primary btn-sm" onclick="window.__thermosafe.selectEvent('${n.eventId}'); window.__thermosafe.closeDrawer();">${btnLabel}</button>
+            ${n.unread ? `<button class="btn btn-outline btn-sm" onclick="window.__thermosafe.markRead('${n.id}')">Mark Read</button>` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    let html = '';
+    if (unread.length) {
+      html += `<div class="nav-section-label" style="padding:6px 4px 8px;">Unread (${unread.length})</div>`;
+      html += unread.map(notifHtml).join('');
+    }
+    if (read.length) {
+      html += `<div class="nav-section-label" style="padding:14px 4px 8px;">Read (${read.length})</div>`;
+      html += read.map(notifHtml).join('');
+    }
+    if (!unread.length && !read.length) {
+      html = `<div style="text-align:center;padding:40px 10px;color:var(--text-muted);font-size:13px;">No notifications</div>`;
+    }
+
+    body.innerHTML = html;
+    updateNotifBadge();
+  }
+
+  function markRead(id) {
+    const n = state.notifications.find(x => x.id === id);
+    if (n) {
+      n.unread = false;
+      if (n.dbId) {
+        apiClient.markAlertRead(n.dbId).catch(console.error);
+      }
+    }
+    renderDrawer();
+  }
+
+  function markAllRead() {
+    state.notifications.forEach(n => {
+      n.unread = false;
+      if (n.dbId) {
+        apiClient.markAlertRead(n.dbId).catch(console.error);
+      }
+    });
+    renderDrawer();
+    showToast('Notifications', 'All notifications marked as read.', 'low');
+  }
+
+  function clearNotifications() {
+    state.notifications = [];
+    renderDrawer();
+  }
+
+  function addNotification(level, title, msg, eventId) {
+    const n = {
+      id: 'NT-' + (++state.simCounter),
+      level,
+      title,
+      msg,
+      eventId: eventId || 'TH-2026-00421',
+      time: new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }),
+      unread: true,
+      ts: Date.now()
+    };
+    state.notifications.unshift(n);
+    renderDrawer();
+    updateNotifBadge();
+    showToast(title, msg, level, eventId);
+  }
+
+  function openDrawer() {
+    renderDrawer();
+    document.getElementById('notificationDrawer')?.classList.add('open');
+    const b = document.getElementById('drawerBackdrop');
+    if (b) b.style.display = 'block';
+  }
+
+  function closeDrawer() {
+    document.getElementById('notificationDrawer')?.classList.remove('open');
+    const b = document.getElementById('drawerBackdrop');
+    if (b) b.style.display = 'none';
+  }
+
+  /* ========== BROWSER PUSH NOTIFICATIONS ========== */
+  function requestNotifPermission() {
+    if (!('Notification' in window)) {
+      showToast('Notifications Unavailable', 'This browser does not support Web Notifications.', 'low');
+      return;
+    }
+    Notification.requestPermission().then(perm => {
+      state.browserNotifPermission = perm;
+      if (perm === 'granted') {
+        showToast('Notifications Enabled', 'You will receive critical thermal alerts.', 'low');
+      } else {
+        showToast('Notifications Denied', 'Browser notification permission was not granted.', 'low');
+      }
+    });
+  }
+
+  /* ========== LEAFLET MAP & MARKERS ========== */
+  function initMap() {
+    const mapEl = document.getElementById('map');
+    if (!mapEl) return;
+
+    if (state.map) {
+      try { state.map.remove(); } catch (e) {}
+      state.map = null;
+    }
+
+    state.map = L.map('map', {
+      center: [22.0, 77.0],
+      zoom: 5,
+      zoomControl: true,
+      attributionControl: true
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '© OpenStreetMap contributors | THERMOSAFE AI'
+    }).addTo(state.map);
+
+    state.thermalLayer = L.layerGroup().addTo(state.map);
+    state.facilityLayer = L.layerGroup().addTo(state.map);
+
+    renderMarkers();
+    if (state.showFacilities) renderFacilities();
+  }
+
+  function makeThermalIcon(event) {
+    const colorObj = getEventColor(event);
+    const color = colorObj.hex;
+    const isCritical = event.risk === 'CRITICAL';
+    const isHigh = event.risk === 'HIGH';
+    const size = isCritical ? 24 : isHigh ? 20 : 16;
+    const pulseCls = isCritical ? 'pulse-critical' : isHigh ? 'pulse-high' : '';
+
+    return L.divIcon({
+      className: '',
+      html: `<div class="${pulseCls}" style="
+        width:${size}px;height:${size}px;border-radius:50%;
+        background:${color};
+        border:2.5px solid #FFFFFF;
+        box-shadow:0 0 0 1px rgba(11,37,69,0.35), 0 2px 6px rgba(0,0,0,0.25);
+        display:flex;align-items:center;justify-content:center;
+        "><div style="width:4px;height:4px;border-radius:50%;background:#FFFFFF;"></div></div>`,
+      iconSize: [size, size],
+      iconAnchor: [size/2, size/2],
+      popupAnchor: [0, -size/2]
+    });
+  }
+
+  function makeFacilityIcon() {
+    return L.divIcon({
+      className: '',
+      html: `<div style="
+        width:16px;height:16px;background:#2563EB;
+        border:2.5px solid #FFFFFF;
+        box-shadow:0 0 0 1px rgba(11,37,69,0.35), 0 2px 6px rgba(0,0,0,0.25);
+        display:flex;align-items:center;justify-content:center;
+        border-radius:3px;
+        "><svg width="8" height="8" fill="white" viewBox="0 0 24 24"><path d="M3 21h18V8l-8-5-8 5v13zm10-11h-2v2H9v-2H7v4h2v-2h2v2h2v-4z"/></svg></div>`,
+      iconSize: [16, 16],
+      iconAnchor: [8, 8],
+      popupAnchor: [0, -8]
+    });
+  }
+
+  function renderMarkers() {
+    if (!state.thermalLayer) return;
+    state.thermalLayer.clearLayers();
+    state.markers = {};
+    state.heatmapData = [];
+
+    currentEvents.forEach(ev => {
+      const marker = L.marker([ev.lat, ev.lng], {
+        icon: makeThermalIcon(ev),
+        title: ev.id
+      });
+
+      marker.bindPopup(`
+        <div style="min-width:220px;font-family:'Source Serif 4',Georgia,serif;">
+          <div style="font-weight:800;font-size:14px;color:#0B2545;margin-bottom:4px;">${escapeHtml(ev.id)}</div>
+          <div style="font-size:11px;color:#4A5568;margin-bottom:8px;">${escapeHtml(ev.city)}, ${escapeHtml(ev.state)}</div>
+          <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
+            ${classBadge(ev.classification)}
+            ${riskBadge(ev.risk)}
+          </div>
+          <div style="font-size:12px;margin-bottom:4px;color:#0B2545;"><b>Risk Score:</b> ${ev.score}/100</div>
+          <div style="font-size:12px;margin-bottom:4px;color:#0B2545;"><b>AI Confidence:</b> ${ev.confidence}%</div>
+          <div style="font-size:12px;margin-bottom:8px;color:#0B2545;"><b>Intensity:</b> ${ev.intensity}</div>
+          <button onclick="window.__thermosafe.selectEvent('${ev.id}')" style="
+            background:#1E5AA8;color:white;border:none;padding:8px 14px;
+            border-radius:6px;font-size:12px;font-weight:700;width:100%;
+            cursor:pointer;font-family:inherit;
+            ">View Full Analysis</button>
+        </div>
+      `);
+
+      marker.on('click', () => {
+        if (window.innerWidth <= 900) {
+          openBottomSheet(ev.id);
+        } else {
+          selectEvent(ev.id);
+        }
+      });
+
+      marker.addTo(state.thermalLayer);
+      state.markers[ev.id] = marker;
+      state.heatmapData.push([ev.lat, ev.lng, Math.min(1, ev.score / 100)]);
+    });
+  }
+
+  function renderFacilities() {
+    if (!state.facilityLayer) return;
+    state.facilityLayer.clearLayers();
+    currentFacilities.forEach(f => {
+      const m = L.marker([f.lat, f.lng], { icon: makeFacilityIcon(), title: f.name });
+      m.bindPopup(`
+        <div style="min-width:200px;font-family:'Source Serif 4',Georgia,serif;">
+          <div style="font-weight:800;font-size:13px;color:#0B2545;margin-bottom:4px;">${escapeHtml(f.name)}</div>
+          <div style="font-size:11px;color:#4A5568;margin-bottom:4px;">Facility ID: ${f.id}</div>
+          <div style="font-size:12px;color:#0B2545;"><b>Type:</b> ${escapeHtml(f.type)}</div>
+          <div style="font-size:12px;color:#0B2545;"><b>Operator:</b> ${escapeHtml(f.operator || 'Industrial')}</div>
+          <div style="font-size:12px;color:#0B2545;"><b>Risk Level:</b> ${escapeHtml(f.capacity)}</div>
+        </div>
+      `);
+      m.addTo(state.facilityLayer);
+    });
+  }
+
+  function toggleHeatmap() {
+    state.showHeatmap = !state.showHeatmap;
+    if (state.showHeatmap) {
+      showToast('Heatmap Enabled', 'Displaying composite thermal risk density.', 'low');
+    } else {
+      showToast('Heatmap Disabled', 'Default pin marker mode active.', 'low');
+    }
+  }
+
+  /* ========== EVENT SELECTION & AI PANEL ========== */
+  function selectEvent(id) {
+    const ev = getEventById(id);
+    if (!ev) return;
+    state.selectedEvent = ev;
+
+    if (state.map) {
+      state.map.setView([ev.lat, ev.lng], 8, { animate: true });
+    }
+
+    if (window.innerWidth <= 900) {
+      openBottomSheet(id);
+    } else {
+      renderAIPanel(ev);
+    }
+
+    const color = getEventColor(ev);
+    showToast(
+      `Selected: ${ev.classification}`,
+      `${ev.id} · ${ev.city} · Risk ${ev.risk} · Confidence ${ev.confidence}%`,
+      color.clsShort,
+      ev.id
+    );
+  }
+
+  function openBottomSheet(id) {
+    const ev = getEventById(id);
+    if (!ev) return;
+    state.selectedEvent = ev;
+    const sheet = document.getElementById('bottomSheet');
+    const content = document.getElementById('sheetContent');
+    if (!sheet || !content) return;
+
+    content.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div style="font-weight:800;font-size:15px;color:#0B2545;">${escapeHtml(ev.id)}</div>
+        ${riskBadge(ev.risk)}
+      </div>
+      <div style="font-size:12px;color:#4A5568;margin-bottom:10px;">${escapeHtml(ev.city)}, ${escapeHtml(ev.state)}</div>
+      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+        ${classBadge(ev.classification)}
+      </div>
+      <div class="detail-row"><span class="detail-label">Event Type</span><span class="detail-value">${escapeHtml(ev.eventType || ev.classification)}</span></div>
+      <div class="detail-row"><span class="detail-label">AI Classification</span><span class="detail-value">${escapeHtml(ev.classification)}</span></div>
+      <div class="detail-row"><span class="detail-label">Risk Priority</span><span class="detail-value">${riskBadge(ev.risk)}</span></div>
+      <div class="detail-row"><span class="detail-label">Risk Score</span><span class="detail-value">${ev.score}/100</span></div>
+      <div class="detail-row"><span class="detail-label">AI Confidence</span><span class="detail-value">${ev.confidence}%</span></div>
+      <div class="detail-row"><span class="detail-label">Coordinates</span><span class="detail-value font-mono">${ev.lat.toFixed(4)}° N, ${ev.lng.toFixed(4)}° E</span></div>
+      <div class="detail-row"><span class="detail-label">Thermal Intensity</span><span class="detail-value">${ev.intensity}</span></div>
+      <div class="detail-row"><span class="detail-label">Persistence</span><span class="detail-value">${ev.persistence}</span></div>
+      <div class="detail-row"><span class="detail-label">Nearby Facility</span><span class="detail-value">${escapeHtml(ev.facility || '—')}</span></div>
+      <div class="detail-row"><span class="detail-label">Detection Time</span><span class="detail-value font-mono">${ev.detected}</span></div>
+      <div style="margin-top:10px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;">AI Explanation</div>
+      <div style="margin-top:4px;font-size:12px;color:var(--text-secondary);line-height:1.5;background:var(--bg-section);padding:8px;border-radius:6px;border:1px solid var(--border);">${escapeHtml(ev.explanation)}</div>
+
+      <button class="btn btn-primary btn-block mt-3" onclick="window.__thermosafe.closeBottomSheet(); window.__thermosafe.selectEvent('${ev.id}');">
+        View Full Analysis
+      </button>
+    `;
+    sheet.classList.add('open');
+  }
+
+  function closeBottomSheet() {
+    document.getElementById('bottomSheet')?.classList.remove('open');
+  }
+
+  function renderAIPanel(ev) {
+    const panel = document.getElementById('ai-panel-content');
+    if (!panel) return;
+
+    if (!ev) {
+      panel.innerHTML = `
+        <div style="text-align:center;padding:24px 0;color:#7A8699;font-size:13px;line-height:1.6;">
+          <div style="font-size:36px;margin-bottom:10px;opacity:0.5;">🛰️</div>
+          Select a thermal marker on the map<br>to view AI classification.
+        </div>
+      `;
+      return;
+    }
+
+    const color = getEventColor(ev);
+    const factors = ev.factors || [
+      { label:'Industrial proximity', pct:35 },
+      { label:'Thermal signature', pct:30 },
+      { label:'Persistence', pct:20 },
+      { label:'Historical pattern', pct:10 },
+      { label:'Land cover', pct:5 }
+    ];
+
+    panel.innerHTML = `
+      <div style="animation:fadeIn 0.3s ease;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <div style="font-weight:800;font-size:14px;color:#0B2545;">${escapeHtml(ev.id)}</div>
+          ${riskBadge(ev.risk)}
+        </div>
+        <div style="font-size:11px;color:#4A5568;margin-bottom:12px;">${escapeHtml(ev.city)}, ${escapeHtml(ev.state)} · ${ev.detected}</div>
+
+        <div style="font-size:10px;color:#7A8699;text-transform:uppercase;letter-spacing:0.8px;font-weight:700;margin-bottom:4px;">Event Type</div>
+        <div style="margin-bottom:12px;">${classBadge(ev.eventType || ev.classification)}</div>
+
+        <div style="font-size:10px;color:#7A8699;text-transform:uppercase;letter-spacing:0.8px;font-weight:700;margin-bottom:4px;">AI Classification</div>
+        <div style="font-weight:700;font-size:14px;color:${color.hex};margin-bottom:12px;">${escapeHtml(ev.classification)}</div>
+
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:#4A5568;margin-bottom:4px;font-weight:600;">
+          <span>AI Confidence</span><span style="color:#0B2545;font-weight:800;">${ev.confidence}%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" style="width:${ev.confidence}%;background:linear-gradient(90deg,#0891B2,#1E5AA8);"></div>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:#4A5568;margin:10px 0 4px;font-weight:600;">
+          <span>Risk Score</span><span style="color:#0B2545;font-weight:800;">${ev.score}/100</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" style="width:${ev.score}%;background:${getRiskColor(ev.risk)};"></div>
+        </div>
+
+        <div style="margin-top:16px;font-size:10px;color:#7A8699;text-transform:uppercase;letter-spacing:0.8px;font-weight:700;margin-bottom:8px;">AI Explanation</div>
+        <div style="font-size:12px;color:var(--text-secondary);line-height:1.5;margin-bottom:10px;background:var(--bg-section);padding:8px 10px;border-radius:6px;border:1px solid var(--border);">
+          ${escapeHtml(ev.explanation)}
+        </div>
+
+        ${factors.map(f => `
+          <div style="font-size:11px;margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:3px;color:#4A5568;font-weight:600;">
+              <span>${f.label}</span>
+              <span style="color:#0B2545;font-weight:800;">${f.pct}%</span>
+            </div>
+            <div class="progress-track" style="height:5px;">
+              <div class="progress-fill" style="width:${f.pct}%;background:#1E5AA8;"></div>
+            </div>
+          </div>
+        `).join('')}
+
+        <div style="margin-top:16px;padding-top:12px;border-top:1px solid #D6E2EF;">
+          <div class="detail-row"><span class="detail-label">Thermal Intensity</span><span class="detail-value">${ev.intensity}</span></div>
+          <div class="detail-row"><span class="detail-label">Persistence</span><span class="detail-value">${ev.persistence}</span></div>
+          <div class="detail-row"><span class="detail-label">Coordinates</span><span class="detail-value font-mono" style="font-size:11px;">${ev.lat.toFixed(4)}° N, ${ev.lng.toFixed(4)}° E</span></div>
+          <div class="detail-row"><span class="detail-label">Nearby Facility</span><span class="detail-value">${escapeHtml(ev.facility || '—')}</span></div>
+          <div class="detail-row"><span class="detail-label">Detection Time</span><span class="detail-value font-mono">${ev.detected}</span></div>
+          <div class="detail-row"><span class="detail-label">Land Cover</span><span class="detail-value">${ev.landcover}</span></div>
+          <div class="detail-row"><span class="detail-label">Source</span><span class="detail-value">${ev.source}</span></div>
+        </div>
+
+        <div class="btn-grid" style="margin-top:14px;">
+          <button class="btn btn-outline btn-sm" onclick="window.__thermosafe.navigateTo('reports')">Generate Report</button>
+          <button class="btn btn-danger btn-sm" onclick="window.__thermosafe.createAlertFromEvent('${ev.id}')">Create Alert</button>
+        </div>
+        <button class="btn btn-primary btn-block btn-sm" style="margin-top:8px;" onclick="window.__thermosafe.trackEvent('${ev.id}')">Track Event</button>
+
+        <div style="margin-top:14px;font-size:10px;color:#7A8699;text-align:center;line-height:1.5;">
+          ${state.isLiveBackend ? '🟢 Connected to Live AI Backend & FIRMS Telemetry' : '⚠ DEMO MODE — Local simulated events.<br>Backend offline fallback active.'}
+        </div>
+      </div>
+    `;
+  }
+
+  function createAlertFromEvent(id) {
+    const ev = getEventById(id);
+    if (!ev) return;
+    addNotification(
+      ev.risk === 'CRITICAL' ? 'critical' : 'high',
+      `${ev.classification} — Alert Created`,
+      `Alert generated for ${ev.city}. Risk: ${ev.risk}. AI Confidence: ${ev.confidence}%.`,
+      ev.id
+    );
+  }
+
+  function trackEvent(id) {
+    const ev = getEventById(id);
+    if (!ev) return;
+    showToast('Tracking Event', `Now tracking ${ev.id}. Updates will appear in the live feed.`, 'low', ev.id);
+  }
+
+  /* ========== PAGE RENDERERS ========== */
+  function renderDashboard() {
+    const content = document.getElementById('content');
+    if (!content) return;
+
+    const s = state.backendAnalytics?.summary;
+    const totalEvents = s ? s.total_thermal_events : currentEvents.length;
+    const critEvents = s ? s.critical_events : currentEvents.filter(e => e.risk === 'CRITICAL').length;
+    const highEvents = s ? s.high_risk_events : currentEvents.filter(e => e.risk === 'HIGH').length;
+    const modEvents = s ? s.moderate_events : currentEvents.filter(e => e.risk === 'MEDIUM' || e.classification.includes('Gas')).length;
+    const lowEvents = s ? s.low_risk_events : currentEvents.filter(e => e.risk === 'LOW').length;
+    const facCount = s ? s.industrial_facilities : currentFacilities.length;
+
+    content.innerHTML = `
+      <div class="kpi-grid">
+        <div class="kpi-card info">
+          <div class="kpi-label">Active Thermal Anomalies</div>
+          <div class="kpi-value">${totalEvents}</div>
+          <div class="kpi-sub">${state.isLiveBackend ? 'Live telemetry synchronized' : 'Simulated observations'}</div>
+        </div>
+        <div class="kpi-card critical">
+          <div class="kpi-label">Critical Industrial Fires</div>
+          <div class="kpi-value">${critEvents}</div>
+          <div class="kpi-sub">Immediate response required</div>
+        </div>
+        <div class="kpi-card high">
+          <div class="kpi-label">High-Risk Events</div>
+          <div class="kpi-value">${highEvents}</div>
+          <div class="kpi-sub">Active industrial hotspots</div>
+        </div>
+        <div class="kpi-card medium">
+          <div class="kpi-label">Gas Flares & Moderate</div>
+          <div class="kpi-value">${modEvents}</div>
+          <div class="kpi-sub">Continuous monitoring</div>
+        </div>
+        <div class="kpi-card persistent">
+          <div class="kpi-label">Monitored Facilities</div>
+          <div class="kpi-value">${facCount}</div>
+          <div class="kpi-sub">Industrial perimeter registry</div>
+        </div>
+        <div class="kpi-card low">
+          <div class="kpi-label">Normal / Low Activity</div>
+          <div class="kpi-value">${lowEvents}</div>
+          <div class="kpi-sub">Baseline thermal levels</div>
+        </div>
+      </div>
+
+      <div class="dashboard-grid" style="height:calc(100vh - 260px);min-height:520px;">
+        <div class="map-container">
+          <div id="map"></div>
+          <div class="legend">
+            <div class="legend-title">Thermal Event Legend</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#DC2626;"></div>Critical Industrial Fire</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#EA580C;"></div>High-Risk Thermal Event</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#CA8A04;"></div>Gas Flare / Moderate</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#7C3AED;"></div>Persistent Thermal Source</div>
+            <div class="legend-item"><div class="legend-square" style="background:#2563EB;"></div>Industrial Facility</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#16A34A;"></div>Low-Risk / Normal</div>
+          </div>
+        </div>
+
+        <div class="right-panel">
+          <div class="card">
+            <div class="card-title">
+              <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/><path d="M12 6v6l4 2"/></svg>
+              AI Thermal Classification
+            </div>
+            <div id="ai-panel-content">
+              <div style="text-align:center;padding:24px 0;color:#7A8699;font-size:13px;line-height:1.6;">
+                <div style="font-size:36px;margin-bottom:10px;opacity:0.5;">🛰️</div>
+                Select a thermal marker on the map<br>to view AI classification.
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">
+              <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              Live Event Feed
+            </div>
+            <div id="live-feed">
+              ${LIVE_FEED.slice(0, 6).map(f => `
+                <div class="feed-item">
+                  <span class="feed-time">${f.time}</span>
+                  <span class="feed-text">${escapeHtml(f.text)}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">
+              <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              SIMULATION & CONTROLS
+            </div>
+            <div style="font-size:11px;color:#7A8699;margin-bottom:12px;line-height:1.5;">
+              Trigger simulated incident alerts for demonstration
+            </div>
+            <div class="btn-grid">
+              <button class="btn btn-danger btn-sm" onclick="window.__thermosafe.simulate('Industrial Fire')">🔴 Critical Fire</button>
+              <button class="btn btn-warning btn-sm" onclick="window.__thermosafe.simulate('High-Risk Thermal')">🟠 High-Risk</button>
+            </div>
+            <div class="btn-grid" style="margin-top:8px;">
+              <button class="btn btn-warning btn-sm" style="background:#CA8A04;" onclick="window.__thermosafe.simulate('Gas Flare')">🟡 Gas Flare</button>
+              <button class="btn btn-purple btn-sm" onclick="window.__thermosafe.simulate('Persistent Thermal Source')">🟣 Persistent</button>
+            </div>
+            <button class="btn btn-outline btn-block btn-sm" style="margin-top:8px;" onclick="window.__thermosafe.requestNotifPermission()">
+              🔔 Enable Browser Notifications
+            </button>
+            <button class="btn btn-primary btn-block btn-sm" style="margin-top:8px;" onclick="window.__thermosafe.simulateCritical()">
+              ⚡ SIMULATE CRITICAL ALERT
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    setTimeout(initMap, 50);
+  }
+
+  function renderMapPage() {
+    const content = document.getElementById('content');
+    if (!content) return;
+
+    const critCount = currentEvents.filter(e => e.risk === 'CRITICAL').length;
+    const highCount = currentEvents.filter(e => e.risk === 'HIGH').length;
+    const gasCount = currentEvents.filter(e => e.risk === 'MEDIUM' || e.classification.includes('Gas')).length;
+    const persistCount = currentEvents.filter(e => e.classification.includes('Persistent')).length;
+    const lowCount = currentEvents.filter(e => e.risk === 'LOW').length;
+
+    content.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+        <div>
+          <div style="font-size:20px;font-weight:800;color:#0B2545;">Live Thermal Map</div>
+          <div style="font-size:12px;color:#4A5568;margin-top:2px;">India Corridor · ${currentEvents.length} thermal anomalies · ${currentFacilities.length} facilities</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <span class="demo-pill" style="${state.isLiveBackend ? 'background:rgba(22,163,74,0.2);color:#86EFAC;border-color:rgba(34,197,94,0.4);' : ''}">
+            ● ${state.isLiveBackend ? 'LIVE BACKEND' : 'DEMO MODE'}
+          </span>
+          <button class="btn btn-outline btn-sm" onclick="window.__thermosafe.toggleHeatmap()">
+            ${state.showHeatmap ? '✓ Heatmap On' : 'Heatmap'}
+          </button>
+        </div>
+      </div>
+
+      <div class="kpi-grid" style="margin-bottom:14px;">
+        <div class="kpi-card critical"><div class="kpi-label">Critical</div><div class="kpi-value">${critCount}</div></div>
+        <div class="kpi-card high"><div class="kpi-label">High</div><div class="kpi-value">${highCount}</div></div>
+        <div class="kpi-card medium"><div class="kpi-label">Gas Flare</div><div class="kpi-value">${gasCount}</div></div>
+        <div class="kpi-card persistent"><div class="kpi-label">Persistent</div><div class="kpi-value">${persistCount}</div></div>
+        <div class="kpi-card low"><div class="kpi-label">Low / Normal</div><div class="kpi-value">${lowCount}</div></div>
+      </div>
+
+      <div class="map-container" style="height:calc(100vh - 340px);min-height:480px;">
+        <div id="map"></div>
+        <div class="legend">
+          <div class="legend-title">Thermal Event Legend</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#DC2626;"></div>Critical Industrial Fire</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#EA580C;"></div>High-Risk Thermal Event</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#CA8A04;"></div>Gas Flare / Moderate</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#7C3AED;"></div>Persistent Thermal Source</div>
+          <div class="legend-item"><div class="legend-square" style="background:#2563EB;"></div>Industrial Facility</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#16A34A;"></div>Low-Risk / Normal</div>
+        </div>
+      </div>
+    `;
+    setTimeout(() => { initMap(); if (state.showHeatmap) toggleHeatmap(); }, 50);
+  }
+
+  function renderIncidentsPage() {
+    const content = document.getElementById('content');
+    if (!content) return;
+    const sorted = [...currentEvents].sort((a, b) => b.score - a.score);
+    content.innerHTML = `
+      <div style="font-size:20px;font-weight:800;margin-bottom:4px;color:#0B2545;">Incidents Registry</div>
+      <div style="font-size:12px;color:#4A5568;margin-bottom:16px;">Detected thermal anomalies ranked by evaluated risk score</div>
+
+      <div style="background:#FFFFFF;border:1px solid #D6E2EF;border-radius:10px;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="background:#E8F1FB;color:#0B2545;">
+              <th style="text-align:left;padding:12px;font-weight:800;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;border-bottom:2px solid #1E5AA8;">Event ID</th>
+              <th style="text-align:left;padding:12px;font-weight:800;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;border-bottom:2px solid #1E5AA8;">Classification</th>
+              <th style="text-align:left;padding:12px;font-weight:800;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;border-bottom:2px solid #1E5AA8;">Location</th>
+              <th style="text-align:center;padding:12px;font-weight:800;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;border-bottom:2px solid #1E5AA8;">Risk</th>
+              <th style="text-align:right;padding:12px;font-weight:800;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;border-bottom:2px solid #1E5AA8;">Score</th>
+              <th style="text-align:right;padding:12px;font-weight:800;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;border-bottom:2px solid #1E5AA8;">Confidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sorted.map(ev => `
+              <tr style="border-bottom:1px solid #D6E2EF;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='#F5F8FC'" onmouseout="this.style.background='#FFFFFF'" onclick="window.__thermosafe.selectEvent('${ev.id}')">
+                <td style="padding:10px 12px;font-family:'Courier New',monospace;font-weight:700;color:#0B2545;">${ev.id}</td>
+                <td style="padding:10px 12px;">${classBadge(ev.classification)}</td>
+                <td style="padding:10px 12px;color:#4A5568;">${escapeHtml(ev.city)}, ${escapeHtml(ev.state)}</td>
+                <td style="padding:10px 12px;text-align:center;">${riskBadge(ev.risk)}</td>
+                <td style="padding:10px 12px;text-align:right;font-weight:800;color:#0B2545;">${ev.score}</td>
+                <td style="padding:10px 12px;text-align:right;font-weight:600;color:#1E5AA8;">${ev.confidence}%</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function renderAnalyticsPage() {
+    const content = document.getElementById('content');
+    if (!content) return;
+
+    let classEntries = [];
+    let riskCounts = { CRITICAL:0, HIGH:0, MEDIUM:0, LOW:0 };
+    let timeSeriesPoints = [];
+
+    if (state.backendAnalytics) {
+      if (state.backendAnalytics.event_types?.items) {
+        classEntries = state.backendAnalytics.event_types.items.map(i => [i.event_type, i.count]);
+      }
+      if (state.backendAnalytics.risk_distribution?.items) {
+        state.backendAnalytics.risk_distribution.items.forEach(i => {
+          const k = i.risk_priority.toUpperCase();
+          if (riskCounts[k] !== undefined) riskCounts[k] = i.count;
+          else if (k.includes('MOD') || k.includes('MED')) riskCounts.MEDIUM = i.count;
+        });
+      }
+      if (state.backendAnalytics.time_series?.data_points) {
+        timeSeriesPoints = state.backendAnalytics.time_series.data_points;
+      }
+    }
+
+    if (!classEntries.length) {
+      const classCounts = {};
+      currentEvents.forEach(e => { classCounts[e.classification] = (classCounts[e.classification] || 0) + 1; });
+      classEntries = Object.entries(classCounts).sort((a, b) => b[1] - a[1]);
+      currentEvents.forEach(e => {
+        const r = e.risk in riskCounts ? e.risk : 'LOW';
+        riskCounts[r] = (riskCounts[r] || 0) + 1;
+      });
+    }
+
+    const maxClass = Math.max(...classEntries.map(e => e[1]), 1);
+    const totalCount = currentEvents.length;
+
+    content.innerHTML = `
+      <div style="font-size:20px;font-weight:800;margin-bottom:4px;color:#0B2545;">Analytics & Intelligence</div>
+      <div style="font-size:12px;color:#4A5568;margin-bottom:16px;">
+        ${state.isLiveBackend ? 'Real-time database aggregated thermal intelligence KPIs' : 'Local demonstration telemetry'}
+      </div>
+
+      <div class="kpi-grid" style="margin-bottom:16px;">
+        <div class="kpi-card info"><div class="kpi-label">Total Events</div><div class="kpi-value">${totalCount}</div></div>
+        <div class="kpi-card critical"><div class="kpi-label">Critical</div><div class="kpi-value">${riskCounts.CRITICAL || 0}</div></div>
+        <div class="kpi-card high"><div class="kpi-label">High</div><div class="kpi-value">${riskCounts.HIGH || 0}</div></div>
+        <div class="kpi-card medium"><div class="kpi-label">Medium / Gas</div><div class="kpi-value">${riskCounts.MEDIUM || 0}</div></div>
+        <div class="kpi-card low"><div class="kpi-label">Low / Normal</div><div class="kpi-value">${riskCounts.LOW || 0}</div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;">
+        <div class="card">
+          <div class="card-title">Event Classification Breakdown</div>
+          <div class="chart-container">
+            ${classEntries.map(([name, count]) => {
+              const c = EVENT_COLORS[name] || EVENT_COLORS['Unknown'];
+              return `
+                <div class="bar-row">
+                  <div class="bar-label">${name.length > 16 ? name.slice(0,14) + '…' : name}</div>
+                  <div class="bar-track">
+                    <div class="bar-fill" style="width:${(count/maxClass)*100}%;background:${c.hex};">${count}</div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Risk Priority Distribution</div>
+          <div class="chart-container">
+            ${Object.entries(riskCounts).map(([level, count]) => {
+              const pct = totalCount > 0 ? (count / totalCount) * 100 : 0;
+              return `
+                <div class="bar-row">
+                  <div class="bar-label">${level}</div>
+                  <div class="bar-track">
+                    <div class="bar-fill" style="width:${Math.max(pct, 5)}%;background:${getRiskColor(level)};">${count}</div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title">Thermal Events Over Time (${state.isLiveBackend ? 'Database Chronology' : 'Last 24h Trend'})</div>
+        <div style="display:flex;align-items:flex-end;gap:8px;height:140px;padding-top:12px;">
+          ${(timeSeriesPoints.length ? timeSeriesPoints : [
+            { label:'00h', count:2 }, { label:'04h', count:5 }, { label:'08h', count:9 }, { label:'12h', count:14 }, { label:'16h', count:8 }, { label:'20h', count:4 }
+          ]).map((p) => {
+            const h = Math.min(100, Math.max(15, (p.count || p.total_events || 1) * 12));
+            const lbl = p.timestamp ? new Date(p.timestamp).toLocaleTimeString([], {hour:'2-digit'}) : (p.label || 'T');
+            const cnt = p.total_events !== undefined ? p.total_events : (p.count || 0);
+            return `
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;">
+                <div style="width:100%;height:${h}px;background:linear-gradient(180deg,#DC2626,#1E5AA8);border-radius:4px 4px 0 0;display:flex;align-items:center;justify-content:center;color:white;font-size:10px;font-weight:700;">
+                  ${cnt}
+                </div>
+                <div style="font-size:10px;color:#7A8699;font-weight:600;">${lbl}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderAlertsPage() {
+    const content = document.getElementById('content');
+    if (!content) return;
+    content.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+        <div>
+          <div style="font-size:20px;font-weight:800;color:#0B2545;">Alerts & Notifications</div>
+          <div style="font-size:12px;color:#4A5568;margin-top:2px;">
+            ${state.notifications.length} notifications ${state.isLiveBackend ? '· Database Synchronized' : '· Demo Data'}
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="window.__thermosafe.openDrawer()">Open Notification Drawer</button>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        ${state.notifications.map(a => {
+          const ev = getEventById(a.eventId);
+          const color = ev ? getEventColor(ev).hex : getRiskColor(a.level.toUpperCase());
+          return `
+            <div class="card" style="padding:16px;border-left:5px solid ${color};">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
+                <div style="flex:1;min-width:220px;">
+                  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+                    <span class="risk-badge ${a.level === 'critical' ? 'risk-critical' : a.level === 'high' ? 'risk-high' : 'risk-low'}">${a.level.toUpperCase()}</span>
+                    <span style="font-size:11px;color:#7A8699;font-family:'Courier New',monospace;font-weight:600;">${a.time}</span>
+                    <span style="font-size:11px;color:#7A8699;">${timeAgo(a.ts)}</span>
+                  </div>
+                  <div style="font-weight:800;font-size:15px;color:#0B2545;margin-bottom:6px;">${escapeHtml(a.title)}</div>
+                  <div style="font-size:13px;color:#4A5568;line-height:1.6;">${escapeHtml(a.msg)}</div>
+                  <div style="font-size:11px;color:#7A8699;margin-top:6px;">Event Reference: <span style="font-family:'Courier New',monospace;">${escapeHtml(a.eventId)}</span></div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px;min-width:150px;">
+                  <button class="btn btn-primary btn-sm" onclick="window.__thermosafe.selectEvent('${a.eventId}')">View on Map</button>
+                  <button class="btn btn-success btn-sm" onclick="window.__thermosafe.acknowledge('${a.id}')">Acknowledge</button>
+                  <button class="btn btn-outline btn-sm" onclick="window.__thermosafe.navigateTo('reports')">Generate Report</button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  function renderReportsPage() {
+    const content = document.getElementById('content');
+    if (!content) return;
+    const ev = state.selectedEvent || currentEvents[0];
+    const color = getEventColor(ev);
+
+    content.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+        <div>
+          <div style="font-size:20px;font-weight:800;color:#0B2545;">Incident & Compliance Report</div>
+          <div style="font-size:12px;color:#4A5568;margin-top:2px;">
+            ${state.isLiveBackend ? 'Connected to Backend Reporting Engine' : 'Local Demonstration Mode'}
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-outline btn-sm" onclick="window.__thermosafe.previewReport()">Preview Report</button>
+          <button class="btn btn-primary btn-sm" onclick="window.__thermosafe.downloadReport()">Download CSV / Report</button>
+          <button class="btn btn-outline btn-sm" onclick="window.__thermosafe.shareReport()">Share</button>
+        </div>
+      </div>
+
+      <div class="card" style="border-top:4px solid ${color.hex};">
+        <div style="font-weight:800;font-size:18px;margin-bottom:16px;color:#0B2545;padding-bottom:10px;border-bottom:2px solid #D6E2EF;display:flex;justify-content:space-between;align-items:center;">
+          <span>THERMOSAFE AI — Incident Intelligence Report</span>
+          <button class="btn btn-primary btn-sm" onclick="window.__thermosafe.generateBackendReport()">⚡ Save Report to Database</button>
+        </div>
+        <div class="detail-row"><span class="detail-label">Event ID</span><span class="detail-value font-mono">${ev.id}</span></div>
+        <div class="detail-row"><span class="detail-label">Location</span><span class="detail-value">${escapeHtml(ev.city)}, ${escapeHtml(ev.state)}</span></div>
+        <div class="detail-row"><span class="detail-label">Coordinates</span><span class="detail-value font-mono">${ev.lat.toFixed(4)}° N, ${ev.lng.toFixed(4)}° E</span></div>
+        <div class="detail-row"><span class="detail-label">Classification</span><span class="detail-value">${classBadge(ev.classification)}</span></div>
+        <div class="detail-row"><span class="detail-label">Risk Priority</span><span class="detail-value">${riskBadge(ev.risk)}</span></div>
+        <div class="detail-row"><span class="detail-label">Risk Score</span><span class="detail-value">${ev.score}/100</span></div>
+        <div class="detail-row"><span class="detail-label">AI Confidence</span><span class="detail-value">${ev.confidence}%</span></div>
+        <div class="detail-row"><span class="detail-label">Thermal Intensity</span><span class="detail-value">${ev.intensity}</span></div>
+        <div class="detail-row"><span class="detail-label">Persistence</span><span class="detail-value">${ev.persistence}</span></div>
+        <div class="detail-row"><span class="detail-label">Nearby Facility</span><span class="detail-value">${escapeHtml(ev.facility || '—')}</span></div>
+        <div class="detail-row"><span class="detail-label">Satellite Source</span><span class="detail-value">${ev.source}</span></div>
+        <div class="detail-row"><span class="detail-label">Detected Time</span><span class="detail-value font-mono">${ev.detected}</span></div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title">AI Analysis Context & Explanation</div>
+        <div style="font-size:13px;color:#4A5568;line-height:1.7;">
+          ${escapeHtml(ev.explanation)}
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;border-left:4px solid ${color.hex};">
+        <div class="card-title">Operational Protocol Recommendation</div>
+        <div style="font-size:13px;color:#4A5568;line-height:1.7;">
+          ${ev.risk === 'CRITICAL' ? '⚠ Immediate dispatch to facility safety response unit and district emergency management. Ground thermal verification team within 30 minutes. Secure combustible perimeter.' : ev.risk === 'HIGH' ? '⚠ Notify industrial safety officer and refinery operations control. Schedule ground inspection within 2 hours.' : '● Maintain routine automated satellite pass monitoring. Log incident for long-term historical recurrence modeling.'}
+        </div>
+      </div>
+
+      ${state.backendReports && state.backendReports.length > 0 ? `
+        <div class="card" style="margin-top:16px;">
+          <div class="card-title">Previously Generated Database Reports</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            ${state.backendReports.map(r => `
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg-section);border-radius:6px;border:1px solid var(--border);">
+                <div>
+                  <div style="font-weight:700;font-size:13px;color:var(--navy);">${escapeHtml(r.title)}</div>
+                  <div style="font-size:11px;color:var(--text-muted);">Generated: ${new Date(r.generated_at).toLocaleString()} · Type: ${r.report_type}</div>
+                </div>
+                <a href="${API_BASE_URL}/api/reports/${r.id}/export?format=csv" target="_blank" class="btn btn-outline btn-sm">Download CSV</a>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+    `;
+  }
+
+  function renderSettingsPage() {
+    const content = document.getElementById('content');
+    if (!content) return;
+    content.innerHTML = `
+      <div style="font-size:20px;font-weight:800;margin-bottom:4px;color:#0B2545;">System Settings & Integration</div>
+      <div style="font-size:12px;color:#4A5568;margin-bottom:16px;">System configuration and live backend connectivity status</div>
+
+      <div class="card">
+        <div class="card-title">Live Backend Services</div>
+        <div class="detail-row"><span class="detail-label">API Gateway</span><span class="detail-value font-mono">${API_BASE_URL}</span></div>
+        <div class="detail-row"><span class="detail-label">Backend Status</span><span class="detail-value" style="color:${state.isLiveBackend ? '#16A34A' : '#CA8A04'};font-weight:700;">${state.isLiveBackend ? '🟢 Connected (FastAPI)' : '⚠ Offline (Using Local Fallback)'}</span></div>
+        <div class="detail-row"><span class="detail-label">NASA FIRMS Service</span><span class="detail-value" style="color:#16A34A;">Integrated (Server-side Protected)</span></div>
+        <div class="detail-row"><span class="detail-label">AI Classification Engine</span><span class="detail-value" style="color:#16A34A;">Modular Service (Active)</span></div>
+        <div class="detail-row"><span class="detail-label">Risk Assessment Engine</span><span class="detail-value" style="color:#16A34A;">0–100 Multi-factor Model (Active)</span></div>
+        <div class="detail-row"><span class="detail-label">Database Persistence</span><span class="detail-value" style="color:#16A34A;">SQLite / SQLAlchemy (Active)</span></div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title">Current Analyst Session</div>
+        <div class="detail-row"><span class="detail-label">User</span><span class="detail-value">${state.currentUser ? escapeHtml(state.currentUser.full_name) : 'Guest (Click Profile icon to Sign In)'}</span></div>
+        <div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">${state.currentUser ? escapeHtml(state.currentUser.email) : 'Not Authenticated'}</span></div>
+        <div class="detail-row"><span class="detail-label">Role</span><span class="detail-value">${state.currentUser ? escapeHtml(state.currentUser.role) : 'Public / Observer'}</span></div>
+        <div style="margin-top:12px;">
+          ${state.currentUser ? `
+            <button class="btn btn-danger btn-sm" onclick="window.__thermosafe.logout()">Sign Out</button>
+          ` : `
+            <button class="btn btn-primary btn-sm" onclick="window.__thermosafe.openAuthModal('login')">Sign In to Platform</button>
+          `}
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title">About THERMOSAFE AI</div>
+        <div style="font-size:13px;color:#4A5568;line-height:1.7;">
+          <b style="color:#0B2545;">SIH26162</b> — AI-Based Detection and Classification of Industrial Fires and Persistent Thermal Sources<br>
+          Theme: Disaster Management · Ministry / Org: NTRO
+        </div>
+      </div>
+    `;
+  }
+
+  /* ========== NAVIGATION ========== */
+  function navigateTo(page) {
+    state.currentPage = page;
+    document.querySelectorAll('.sidebar .nav-item').forEach(el => {
+      el.classList.toggle('active', el.getAttribute('data-page') === page);
+    });
+    document.querySelectorAll('.mobile-nav-item').forEach(el => {
+      el.classList.toggle('active', el.getAttribute('data-page') === page);
+    });
+
+    if (page === 'dashboard') renderDashboard();
+    else if (page === 'map') renderMapPage();
+    else if (page === 'incidents') renderIncidentsPage();
+    else if (page === 'analytics') renderAnalyticsPage();
+    else if (page === 'alerts') renderAlertsPage();
+    else if (page === 'reports') renderReportsPage();
+    else if (page === 'settings') renderSettingsPage();
+  }
+
+  /* ========== SIMULATION ========== */
+  function simulate(type) {
+    state.simCounter++;
+    const id = 'TH-2026-00' + state.simCounter;
+    const templates = {
+      'Industrial Fire':           { classif:'Industrial Fire', risk:'CRITICAL', score:88 + Math.floor(Math.random()*10), conf:90 + Math.floor(Math.random()*8), facility:'Chemical Plant' },
+      'High-Risk Thermal':         { classif:'Industrial Fire', risk:'HIGH', score:74 + Math.floor(Math.random()*12), conf:82 + Math.floor(Math.random()*10), facility:'Steel Plant' },
+      'Gas Flare':                 { classif:'Gas Flare', risk:'MEDIUM', score:58 + Math.floor(Math.random()*12), conf:76 + Math.floor(Math.random()*10), facility:'Oil Refinery' },
+      'Persistent Thermal Source': { classif:'Persistent Thermal Source', risk:'HIGH', score:75 + Math.floor(Math.random()*15), conf:85 + Math.floor(Math.random()*10), facility:'Thermal Power Plant' }
+    };
+    const t = templates[type] || templates['Industrial Fire'];
+    const cities = [
+      { city:'Jamnagar', state:'Gujarat', lat:22.3039, lng:70.8022 },
+      { city:'Hazira', state:'Gujarat', lat:21.1167, lng:72.6500 },
+      { city:'Visakhapatnam', state:'Andhra Pradesh', lat:17.6868, lng:83.2185 },
+      { city:'Mumbai', state:'Maharashtra', lat:19.0760, lng:72.8777 }
+    ];
+    const loc = cities[Math.floor(Math.random() * cities.length)];
+    const jitter = () => (Math.random() - 0.5) * 0.4;
+
+    const newEvent = {
+      id,
+      lat: loc.lat + jitter(),
+      lng: loc.lng + jitter(),
+      city: loc.city,
+      state: loc.state,
+      classification: t.classif,
+      risk: t.risk,
+      score: t.score,
+      confidence: t.conf,
+      intensity:'HIGH',
+      persistence:'2.4 hours',
+      facility: t.facility,
+      landcover:'Industrial',
+      source:'NASA FIRMS (Simulation)',
+      detected: new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }),
+      explanation: 'Simulated high-radiance thermal anomaly for presentation validation.',
+      factors: [
+        { label:'Thermal intensity', pct:35 },
+        { label:'Industrial proximity', pct:35 },
+        { label:'Persistence', pct:20 },
+        { label:'Historical pattern', pct:10 }
+      ]
+    };
+
+    currentEvents.unshift(newEvent);
+    renderMarkers();
+    addNotification(t.risk === 'CRITICAL' ? 'critical' : 'high',
+      `${t.classif} Detected — ${loc.city}`,
+      `Thermal activity detected near ${t.facility}. Risk Score: ${t.score}/100.`,
+      id
+    );
+    selectEvent(id);
+  }
+
+  function simulateCritical() {
+    simulate('Industrial Fire');
+  }
+
+  function acknowledge(id) {
+    const n = state.notifications.find(x => x.id === id);
+    if (n) {
+      n.unread = false;
+      if (n.dbId) {
+        apiClient.markAlertRead(n.dbId).catch(console.error);
+      }
+      addNotification('low', 'Alert Acknowledged', `${n.title} has been acknowledged.`, n.eventId);
+    }
+    renderDrawer();
+    showToast('Alert Acknowledged', `${id} marked as acknowledged.`, 'low');
+  }
+
+  /* ========== REPORT GENERATION & DOWNLOAD ========== */
+  function previewReport() {
+    showToast('Report Preview', 'Full compliance audit preview loaded below.', 'low');
+  }
+
+  async function generateBackendReport() {
+    const ev = state.selectedEvent || currentEvents[0];
+    showToast('Generating Report', 'Creating structured report in database...', 'low');
+    try {
+      const res = await apiClient.createReport({
+        title: `Thermal Incident Intelligence Report - ${ev.id}`,
+        report_type: 'incident_report',
+        filters: {
+          risk_priority: ev.risk,
+          event_type: ev.classification
+        }
+      });
+      if (res && res.id) {
+        showToast('Report Generated', `Report #${res.id} persisted to database.`, 'low');
+        const list = await apiClient.getReports(10);
+        if (list && list.items) state.backendReports = list.items;
+        renderReportsPage();
+      }
+    } catch (err) {
+      showToast('Report Error', err.message || 'Could not save to database.', 'high');
+    }
+  }
+
+  async function downloadReport() {
+    const ev = state.selectedEvent || currentEvents[0];
+    if (state.isLiveBackend) {
+      try {
+        showToast('Exporting Report', 'Generating CSV export from backend...', 'low');
+        const res = await apiClient.createReport({
+          title: `Thermal Incident Export - ${ev.id}`,
+          report_type: 'incident_report',
+          filters: {
+            risk_priority: ev.risk
+          }
+        });
+        if (res && res.id) {
+          const csvData = await apiClient.exportReportCsv(res.id);
+          const blob = new Blob([csvData], { type: 'text/csv' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `thermo_report_${res.id}.csv`;
+          a.click();
+          URL.revokeObjectURL(url);
+          showToast('Downloaded', `thermo_report_${res.id}.csv saved.`, 'low');
+          return;
+        }
+      } catch (err) {
+        console.warn('Backend export failed, falling back to local file', err);
+      }
+    }
+
+    // Local fallback text file
+    const txt = `THERMOSAFE AI — INCIDENT REPORT
+================================================
+Event ID: ${ev.id}
+Location: ${ev.city}, ${ev.state}
+Coordinates: ${ev.lat.toFixed(4)}° N, ${ev.lng.toFixed(4)}° E
+Classification: ${ev.classification}
+Risk Priority: ${ev.risk}
+Risk Score: ${ev.score}/100
+AI Confidence: ${ev.confidence}%
+Thermal Intensity: ${ev.intensity}
+Persistence: ${ev.persistence}
+Nearby Facility: ${ev.facility || 'N/A'}
+Source: ${ev.source}
+Detected Time: ${ev.detected}
+Explanation: ${ev.explanation}
+
+⚠ Generated via THERMOSAFE AI Industrial Thermal Intelligence.
+`;
+    const blob = new Blob([txt], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${ev.id}-report.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Report Downloaded', `${ev.id}-report.txt saved.`, 'low');
+  }
+
+  function shareReport() {
+    const ev = state.selectedEvent || currentEvents[0];
+    if (navigator.share) {
+      navigator.share({ title: 'THERMOSAFE AI Report', text: `Incident ${ev.id} — ${ev.classification} — Risk ${ev.risk}` }).catch(()=>{});
+    } else {
+      showToast('Share Link', 'Report link copied to clipboard.', 'low');
+    }
+  }
+
+  /* ========== AUTHENTICATION MODAL & LOGIC ========== */
+  function updateAuthUI() {
+    state.authToken = localStorage.getItem('thermo_jwt_token') || null;
+    const profileBtn = document.getElementById('profileBtn');
+    const mobileProfileBtn = document.querySelector('.mobile-nav-item[data-page="settings"]');
+    if (state.currentUser) {
+      const initial = (state.currentUser.full_name || state.currentUser.email || 'A')[0].toUpperCase();
+      if (profileBtn) {
+        profileBtn.innerHTML = `
+          <span style="width:22px;height:22px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;letter-spacing:0;">${escapeHtml(initial)}</span>
+        `;
+        profileBtn.setAttribute('title', `${state.currentUser.full_name} (${state.currentUser.role || 'Analyst'})`);
+      }
+      if (mobileProfileBtn) {
+        mobileProfileBtn.setAttribute('title', `${state.currentUser.full_name} (${state.currentUser.role || 'Analyst'})`);
+      }
+    } else {
+      if (profileBtn) {
+        profileBtn.innerHTML = `
+          <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="8" r="4"/><path d="M4 21v-2a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v2"/>
+          </svg>
+        `;
+        profileBtn.setAttribute('title', 'Sign In / Register');
+      }
+    }
+    if (state.currentPage === 'settings') renderSettingsPage();
+  }
+
+  function openAuthModal(mode = 'login') {
+    const modal = document.getElementById('authModal');
+    const backdrop = document.getElementById('authBackdrop');
+    const body = document.getElementById('authModalBody');
+    if (!modal || !backdrop || !body) return;
+
+    if (state.currentUser) {
+      document.getElementById('authModalTitle').textContent = 'User Profile';
+      body.innerHTML = `
+        <div style="text-align:center;margin-bottom:16px;">
+          <div style="width:56px;height:56px;background:var(--blue-light);color:var(--blue);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 12px;font-weight:800;">
+            ${(state.currentUser.full_name || 'U')[0].toUpperCase()}
+          </div>
+          <div style="font-weight:800;font-size:17px;color:var(--navy);">${escapeHtml(state.currentUser.full_name || 'Operator')}</div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">${escapeHtml(state.currentUser.email)}</div>
+          <div style="margin-top:8px;">
+            <span class="risk-badge risk-facility" style="text-transform:uppercase;">Role: ${escapeHtml(state.currentUser.role || 'Analyst')}</span>
+          </div>
+        </div>
+        <div style="background:var(--bg-section);padding:12px;border-radius:8px;font-size:12px;margin-bottom:18px;border:1px solid var(--border);">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <span style="color:var(--text-muted);">Session Status:</span>
+            <span style="color:var(--c-low);font-weight:700;">● Active (JWT Token Verified)</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;">
+            <span style="color:var(--text-muted);">API Base:</span>
+            <span style="font-family:'Courier New',monospace;color:var(--navy);font-weight:600;">${API_BASE_URL}</span>
+          </div>
+        </div>
+        <button class="btn btn-danger btn-block" onclick="window.__thermosafe.logout()">Sign Out</button>
+      `;
+    } else {
+      document.getElementById('authModalTitle').textContent = mode === 'signup' ? 'Create Analyst Account' : 'Analyst Authentication';
+      const isLogin = mode === 'login';
+      body.innerHTML = `
+        <div style="display:flex;gap:8px;margin-bottom:18px;background:var(--bg-section);padding:4px;border-radius:8px;border:1px solid var(--border);">
+          <button type="button" style="flex:1;padding:8px;border:none;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;background:${isLogin ? 'var(--blue)' : 'transparent'};color:${isLogin ? '#fff' : 'var(--navy)'};" onclick="window.__thermosafe.openAuthModal('login')">Sign In</button>
+          <button type="button" style="flex:1;padding:8px;border:none;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;background:${!isLogin ? 'var(--blue)' : 'transparent'};color:${!isLogin ? '#fff' : 'var(--navy)'};" onclick="window.__thermosafe.openAuthModal('signup')">Register</button>
+        </div>
+        <form id="authForm" onsubmit="window.__thermosafe.handleAuthSubmit(event, '${mode}')" style="display:flex;flex-direction:column;gap:12px;">
+          ${!isLogin ? `
+            <div>
+              <label style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">Full Name</label>
+              <input type="text" id="authFullName" required placeholder="e.g. Commander Rajesh V." style="width:100%;height:38px;border:1px solid var(--border);border-radius:6px;padding:0 10px;font-family:inherit;font-size:13px;outline:none;" />
+            </div>
+            <div>
+              <label style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">Operational Role</label>
+              <select id="authRole" style="width:100%;height:38px;border:1px solid var(--border);border-radius:6px;padding:0 10px;font-family:inherit;font-size:13px;outline:none;background:#fff;">
+                <option value="analyst">Thermal Intelligence Analyst</option>
+                <option value="admin">Platform Administrator</option>
+                <option value="viewer">Facility Operator / Responder (Viewer)</option>
+              </select>
+            </div>
+          ` : ''}
+          <div>
+            <label style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">Email Address</label>
+            <input type="email" id="authEmail" required placeholder="analyst@domain.gov.in" style="width:100%;height:38px;border:1px solid var(--border);border-radius:6px;padding:0 10px;font-family:inherit;font-size:13px;outline:none;" />
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">Password</label>
+            <input type="password" id="authPassword" required minlength="6" placeholder="••••••••••••" style="width:100%;height:38px;border:1px solid var(--border);border-radius:6px;padding:0 10px;font-family:inherit;font-size:13px;outline:none;" />
+          </div>
+          <div id="authError" style="display:none;background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5;padding:8px 12px;border-radius:6px;font-size:12px;font-weight:600;margin-top:4px;line-height:1.4;"></div>
+          <button type="submit" id="authSubmitBtn" class="btn btn-primary btn-block" style="margin-top:6px;height:40px;">
+            ${isLogin ? 'Sign In to Platform' : 'Create Account'}
+          </button>
+          <div style="text-align:center;font-size:12px;color:var(--text-secondary);margin-top:8px;">
+            ${isLogin ? 
+              `Don't have an account? <a href="javascript:void(0)" onclick="window.__thermosafe.openAuthModal('signup')" style="color:var(--blue);font-weight:700;text-decoration:none;">Create an account</a>` : 
+              `Already have an account? <a href="javascript:void(0)" onclick="window.__thermosafe.openAuthModal('login')" style="color:var(--blue);font-weight:700;text-decoration:none;">Sign In</a>`}
+          </div>
+        </form>
+      `;
+    }
+
+    modal.style.display = 'block';
+    backdrop.style.display = 'block';
+  }
+
+  function closeAuthModal() {
+    const modal = document.getElementById('authModal');
+    const backdrop = document.getElementById('authBackdrop');
+    if (modal) modal.style.display = 'none';
+    if (backdrop) backdrop.style.display = 'none';
+  }
+
+  async function handleAuthSubmit(event, mode) {
+    event.preventDefault();
+    const btn = document.getElementById('authSubmitBtn');
+    const errBox = document.getElementById('authError');
+    if (errBox) errBox.style.display = 'none';
+    if (btn) { btn.disabled = true; btn.textContent = 'Processing...'; }
+
+    try {
+      const email = document.getElementById('authEmail').value.trim();
+      const password = document.getElementById('authPassword').value;
+
+      let res;
+      if (mode === 'signup') {
+        const fullName = document.getElementById('authFullName').value.trim();
+        let role = document.getElementById('authRole')?.value || 'analyst';
+        if (!['admin', 'analyst', 'viewer'].includes(role)) role = 'analyst';
+        res = await apiClient.signup(fullName, email, password, role);
+      } else {
+        res = await apiClient.login(email, password);
+      }
+
+      if (res && res.access_token) {
+        localStorage.setItem('thermo_jwt_token', res.access_token);
+        state.authToken = res.access_token;
+        state.currentUser = res.user;
+        closeAuthModal();
+        updateAuthUI();
+        showToast('Authentication Successful', `Welcome, ${state.currentUser.full_name}!`, 'low');
+      }
+    } catch (err) {
+      if (errBox) {
+        errBox.textContent = err.message || 'Authentication failed. Please verify credentials.';
+        errBox.style.display = 'block';
+      }
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = mode === 'signup' ? 'Create Account' : 'Sign In to Platform';
+      }
+    }
+  }
+
+  function logout() {
+    localStorage.removeItem('thermo_jwt_token');
+    state.authToken = null;
+    state.currentUser = null;
+    closeAuthModal();
+    updateAuthUI();
+    showToast('Signed Out', 'You have been signed out successfully.', 'low');
+  }
+
+  /* ========== GLOBAL INITIALIZATION & BACKEND SYNC ========== */
+  function setBackendStatus(isLive) {
+    state.isLiveBackend = isLive;
+    const pill = document.getElementById('backendPill');
+    if (pill) {
+      if (isLive) {
+        pill.innerHTML = '● LIVE BACKEND';
+        pill.style.background = 'rgba(22,163,74,0.2)';
+        pill.style.color = '#86EFAC';
+        pill.style.borderColor = 'rgba(34,197,94,0.4)';
+      } else {
+        pill.innerHTML = '● DEMO DATA';
+        pill.style.background = 'rgba(202,138,4,0.25)';
+        pill.style.color = '#FDE68A';
+        pill.style.borderColor = 'rgba(202,138,4,0.5)';
+      }
+    }
+  }
+
+  async function initBackendSync() {
+    try {
+      const isHealthy = await apiClient.checkHealth();
+      if (!isHealthy) {
+        setBackendStatus(false);
+        updateAuthUI();
+        return;
+      }
+      setBackendStatus(true);
+
+      // Verify stored user session
+      if (localStorage.getItem('thermo_jwt_token')) {
+        try {
+          state.currentUser = await apiClient.getCurrentUser();
+          updateAuthUI();
+        } catch (e) {
+          localStorage.removeItem('thermo_jwt_token');
+          state.currentUser = null;
+          updateAuthUI();
+        }
+      } else {
+        updateAuthUI();
+      }
+
+      // 1. Fetch thermal events
+      try {
+        const evResp = await apiClient.getThermalEvents(100);
+        if (evResp && evResp.items && evResp.items.length > 0) {
+          currentEvents = evResp.items.map(mapBackendEvent);
+          renderMarkers();
+          if (state.currentPage === 'incidents') renderIncidentsPage();
+        }
+      } catch (err) {
+        console.warn('Events fallback to demo:', err);
+      }
+
+      // 2. Fetch facilities
+      try {
+        const facResp = await apiClient.getFacilities(100);
+        if (facResp && facResp.items && facResp.items.length > 0) {
+          currentFacilities = facResp.items.map(mapBackendFacility);
+          renderFacilities();
+        }
+      } catch (err) {
+        console.warn('Facilities fallback to demo:', err);
+      }
+
+      // 3. Fetch alerts
+      try {
+        const alertResp = await apiClient.getAlerts(50);
+        if (alertResp && alertResp.items && alertResp.items.length > 0) {
+          state.notifications = alertResp.items.map(mapBackendAlert);
+          renderDrawer();
+          updateNotifBadge();
+          if (state.currentPage === 'alerts') renderAlertsPage();
+        }
+      } catch (err) {
+        console.warn('Alerts fallback to demo:', err);
+      }
+
+      // 4. Fetch analytics aggregations
+      try {
+        const summary = await apiClient.getAnalyticsSummary();
+        const riskDist = await apiClient.getRiskDistribution();
+        const eventTypes = await apiClient.getEventTypes();
+        const timeSeries = await apiClient.getTimeSeries();
+        state.backendAnalytics = {
+          summary,
+          risk_distribution: riskDist,
+          event_types: eventTypes,
+          time_series: timeSeries
+        };
+        if (state.currentPage === 'dashboard') renderDashboard();
+        else if (state.currentPage === 'analytics') renderAnalyticsPage();
+      } catch (err) {
+        console.warn('Analytics fallback to demo:', err);
+      }
+
+      // 5. Fetch reports
+      try {
+        const reportsResp = await apiClient.getReports(10);
+        if (reportsResp && reportsResp.items) {
+          state.backendReports = reportsResp.items;
+          if (state.currentPage === 'reports') renderReportsPage();
+        }
+      } catch (err) {
+        console.warn('Reports fallback to demo:', err);
+      }
+
+    } catch (e) {
+      console.warn('Backend unavailable, using demo mode:', e);
+      setBackendStatus(false);
+    }
+  }
+
+  /* ========== ATTACH LISTENERS ========== */
+  document.querySelectorAll('.sidebar .nav-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const page = btn.getAttribute('data-page');
+      if (page) navigateTo(page);
+    });
+  });
+
+  document.querySelectorAll('.mobile-nav-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const page = btn.getAttribute('data-page');
+      if (page && page !== 'settings') navigateTo(page);
+    });
+  });
+
+  document.getElementById('notifBtn')?.addEventListener('click', openDrawer);
+  document.getElementById('drawerBackdrop')?.addEventListener('click', closeDrawer);
+
+  document.getElementById('bottomSheet')?.addEventListener('click', (e) => {
+    if (e.target.id === 'bottomSheet') closeBottomSheet();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeDrawer();
+      closeAuthModal();
+    }
+  });
+
+  document.getElementById('globalSearch')?.addEventListener('input', (e) => {
+    const q = e.target.value.toLowerCase().trim();
+    if (!q) return;
+    const match = currentEvents.find(ev =>
+      ev.id.toLowerCase().includes(q) ||
+      (ev.city && ev.city.toLowerCase().includes(q)) ||
+      (ev.state && ev.state.toLowerCase().includes(q)) ||
+      (ev.facility && ev.facility.toLowerCase().includes(q)) ||
+      (ev.classification && ev.classification.toLowerCase().includes(q))
+    );
+    if (match) {
+      selectEvent(match.id);
+    }
+  });
+
+  /* ========== GLOBAL EXPORT ========== */
+  window.__thermosafe = {
+    selectEvent,
+    openBottomSheet,
+    closeBottomSheet,
+    simulate,
+    simulateCritical,
+    acknowledge,
+    navigateTo,
+    openDrawer,
+    closeDrawer,
+    markRead,
+    markAllRead,
+    clearNotifications,
+    requestNotifPermission,
+    toggleHeatmap,
+    createAlertFromEvent,
+    trackEvent,
+    previewReport,
+    downloadReport,
+    generateBackendReport,
+    shareReport,
+    openAuthModal,
+    closeAuthModal,
+    handleAuthSubmit,
+    logout,
+    updateAuthUI,
+    apiClient,
+    state
+  };
+
+  /* ========== BOOT ========== */
+  function boot() {
+    renderDrawer();
+    updateNotifBadge();
+    navigateTo('dashboard');
+
+    if ('Notification' in window) {
+      state.browserNotifPermission = Notification.permission;
+    }
+
+    // Connect to live backend asynchronously
+    initBackendSync();
+
+    // Check URL hash for direct signup/login page entry
+    const hash = window.location.hash || '';
+    if (hash === '#signup') {
+      openAuthModal('signup');
+    } else if (hash === '#login') {
+      openAuthModal('login');
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+
+})();
+
+</script>
+</body>
+</html>

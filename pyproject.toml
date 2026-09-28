@@ -1,0 +1,23 @@
+[project]
+name = "sih26162"
+version = "1.0.0"
+description = "SIH26162 - THERMOSAFE AI Industrial Thermal Intelligence Backend"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.28.0",
+    "pydantic>=2.6.0",
+    "pydantic-settings>=2.2.0",
+    "sqlalchemy>=2.0.28",
+    "python-dotenv>=1.0.1",
+    "pyjwt>=2.8.0",
+    "bcrypt>=4.1.0",
+    "email-validator>=2.1.0",
+    "psycopg2-binary>=2.9.9",
+    "firebase-admin>=6.2.0",
+    "httpx>=0.27.0",
+]
+
+[tool.vercel]
+entrypoint = "backend.app.main:app"

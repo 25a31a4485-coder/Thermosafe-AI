@@ -1,0 +1,80 @@
+# ==============================================================================
+# SIH26162 — Git Ignore Configuration
+# ==============================================================================
+
+# Environment variables & secrets (CRITICAL: NEVER COMMIT)
+.env
+.env.*
+!.env.example
+*.env
+backend/.env
+frontend/.env
+*.pem
+*.key
+*.cert
+*.crt
+secrets.json
+
+# Databases
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+backend/sih26162.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing & Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / Frontend (if build tooling added)
+node_modules/
+dist/
+coverage/
+.npm/
+
+# IDE & OS Specific
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+backend/logs/
+
+*.zip
+backend/data/
