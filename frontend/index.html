@@ -5553,10 +5553,13 @@ Explanation: ${ev.explanation}
             }
           } else {
             state.lastFirmsError = satResp.error || satResp.message || '';
-            if (state.dataState !== 'LIVE' || LIVE_DATA.events.length === 0) {
-              activateDemoFallback(satResp.message || 'NASA FIRMS returned 0 events or requires configuration');
-            } else {
-              state.firmsState = 'LIVE_STALE';
+if (state.dataState !== 'LIVE' ||
+    LIVE_DATA.events.length === 0) {
+  activateDemoFallback(satResp.message ||
+    'NASA FIRMS returned 0 events or requires configuration');
+} else {
+  state.firmsState = 'LIVE_STALE';
+}
             }
           }
         }
