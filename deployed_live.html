@@ -2010,78 +2010,74 @@
 
     /* ========== AUTHORITATIVE DATA STATE HELPERS ========== */
   function getSourceLabelText() {
-    if (state.dataSource === 'demo' || state.dataState === 'DEMO_FALLBACK' || state.dataState === 'OFFLINE_FALLBACK') {
-      return 'DEMO DATA';
-    }
     if (state.dataState === 'CONNECTING') {
-      return 'CONNECTING TO NASA FIRMS...';
+      return 'CONNECTING TO NASA FIRMS (INDIA ONLY)...';
     }
-    return 'NASA FIRMS LIVE';
+    if (state.dataState === 'ERROR' || state.firmsState === 'LIVE_UNAVAILABLE') {
+      return 'NASA FIRMS UNAVAILABLE (INDIA ONLY)';
+    }
+    if (state.firmsState === 'LIVE_STALE') {
+      return 'NASA FIRMS LIVE (INDIA ONLY) — CACHED';
+    }
+    if (currentEvents.length === 0) {
+      return 'NASA FIRMS LIVE (INDIA ONLY) — 0 EVENTS';
+    }
+    return 'NASA FIRMS LIVE (INDIA ONLY)';
   }
 
   function getSourceLabelColor() {
-    if (state.dataSource === 'demo' || state.dataState === 'DEMO_FALLBACK' || state.dataState === 'OFFLINE_FALLBACK') return '#CA8A04';
     if (state.dataState === 'CONNECTING') return '#D97706';
+    if (state.dataState === 'ERROR' || state.firmsState === 'LIVE_UNAVAILABLE') return '#DC2626';
+    if (state.firmsState === 'LIVE_STALE') return '#D97706';
     return '#16A34A';
   }
 
   function getLiveStatusBadgeInfo() {
-    if (state.dataSource === 'demo' || state.dataState === 'DEMO_FALLBACK' || state.dataState === 'OFFLINE_FALLBACK') {
-      const isBackendDown = state.dataState === 'OFFLINE_FALLBACK' || !state.backendConnected;
-      return {
-        text: isBackendDown
-          ? 'Live backend temporarily unavailable — displaying demonstration data.'
-          : 'NASA FIRMS feed pending — displaying demonstration data.',
-        badge: 'DEMO DATA',
-        bg: '#FEF3C7',
-        color: '#92400E',
-        subtext: isBackendDown
-          ? 'Live backend temporarily unavailable — displaying demonstration data.'
-          : 'NASA FIRMS feed pending — displaying demonstration data.'
-      };
-    }
     if (state.dataState === 'CONNECTING') {
       return {
-        text: 'Connecting to NASA FIRMS...',
-        badge: 'CONNECTING...',
-        bg: '#EFF6FF',
-        color: '#1D4ED8',
-        subtext: ''
+        text: '● CONNECTING TO NASA FIRMS (INDIA ONLY)...',
+        bg: '#FEF3C7',
+        color: '#92400E'
+      };
+    }
+    if (state.dataState === 'ERROR' || state.firmsState === 'LIVE_UNAVAILABLE') {
+      return {
+        text: '● NASA FIRMS UNAVAILABLE (INDIA ONLY)',
+        bg: '#FEF2F2',
+        color: '#991B1B'
       };
     }
     if (state.firmsState === 'LIVE_STALE') {
       const timeStr = state.lastSuccessfulFirmsFetch ? state.lastSuccessfulFirmsFetch.toLocaleTimeString() : 'RECENT';
       return {
-        text: `● NASA FIRMS LIVE — CACHED (${timeStr})`,
-        badge: 'NASA FIRMS LIVE',
+        text: `● NASA FIRMS LIVE (INDIA ONLY) — CACHED (${timeStr})`,
         bg: '#FEF3C7',
-        color: '#92400E',
-        subtext: `Satellite telemetry cached (${timeStr}).`
+        color: '#92400E'
+      };
+    }
+    if (currentEvents.length === 0) {
+      return {
+        text: '● NASA FIRMS LIVE (INDIA ONLY) — 0 EVENTS',
+        bg: '#DBEAFE',
+        color: '#1E40AF'
       };
     }
     return {
-      text: '● NASA FIRMS LIVE',
-      badge: 'NASA FIRMS LIVE',
+      text: '● NASA FIRMS LIVE (INDIA ONLY)',
       bg: '#DCFCE7',
-      color: '#166534',
-      subtext: ''
+      color: '#166534'
     };
   }
 
-  function applyDemoFallbackState(reason = 'Live backend temporarily unavailable — displaying demonstration data.', isBackendOffline = false) {
-    console.warn(`[ThermoSafe Fallback] Activating demo fallback mode: ${reason}`);
-    state.dataSource = 'demo';
-    state.dataState = isBackendOffline ? 'OFFLINE_FALLBACK' : 'DEMO_FALLBACK';
-    state.firmsState = 'DEMO';
-    state.backendConnected = !isBackendOffline;
-    state.isLiveBackend = !isBackendOffline;
+  function activateDemoFallback(reason = 'NASA FIRMS live service unavailable or delayed') {
+    console.warn(`[ThermoSafe] NASA FIRMS live unavailable: ${reason}`);
+    state.dataState = 'ERROR';
+    state.firmsState = 'LIVE_UNAVAILABLE';
     state.lastApiError = reason;
-    state.lastFirmsError = reason;
-    state.liveStatusMessage = reason;
-    currentEvents = (DEMO_DATA.events && DEMO_DATA.events.length > 0) ? DEMO_DATA.events : BUILTIN_DEMO_EVENTS;
-    currentFacilities = DEMO_DATA.facilities;
-    state.notifications = DEMO_DATA.notifications;
-    LIVE_DATA.events = [];
+    state.liveStatusMessage = '● NASA FIRMS UNAVAILABLE (India Scope Active)';
+
+    // Enforce India-only live mode: Never replace live events with demo or global data.
+    currentEvents = LIVE_DATA.events || [];
 
     if (state.currentPage === 'dashboard') {
       updateDashboardLiveView();
@@ -2089,18 +2085,9 @@
       renderMarkers();
       if (state.showFacilities) renderFacilities();
       if (state.currentPage === 'incidents') renderIncidentsPage();
-      if (state.currentPage === 'alerts') renderAlertsPage();
     }
     updateDataSourceUI();
     updateDebugDiagnostics();
-  }
-
-  function activateFirmsUnavailable(reason = 'Live backend temporarily unavailable — displaying demonstration data.') {
-    applyDemoFallbackState(reason, false);
-  }
-
-  function activateDemoFallback(reason = 'Live backend temporarily unavailable — displaying demonstration data.', isBackendOffline = false) {
-    applyDemoFallbackState(reason, isBackendOffline);
   }
 
   /* ========== LOCAL OPERATOR SESSION (PHASE 28) ========== */
@@ -2157,41 +2144,26 @@
         }
         return 'http://127.0.0.1:8000';
       }
-      return 'https://thermosafe-ai.onrender.com';
+      return window.location.origin.replace(/\/+$/, '');
     }
-    return 'https://thermosafe-ai.onrender.com';
+    return 'http://127.0.0.1:8000';
   }
 
   const API_BASE_URL = resolveApiBaseUrl();
 
   const apiClient = {
-    async request(endpoint, options = {}, retries = 1) {
+    async request(endpoint, options = {}) {
       const url = `${API_BASE_URL}${endpoint}`;
       const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
       const token = localStorage.getItem('thermo_jwt_token');
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
-
-      const controller = new AbortController();
-      const timeoutMs = options.timeout || 15000;
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
       let resp;
       try {
-        resp = await fetch(url, { ...options, headers, signal: controller.signal });
+        resp = await fetch(url, { ...options, headers });
       } catch (netErr) {
-        clearTimeout(timeoutId);
-        if (netErr.name === 'AbortError') {
-          throw new Error('Backend service temporarily unavailable (request timeout).');
-        }
-        if (retries > 0) {
-          await new Promise(r => setTimeout(r, 1000));
-          return await this.request(endpoint, options, retries - 1);
-        }
-        throw new Error('Backend service temporarily unavailable. Please try again.');
-      } finally {
-        clearTimeout(timeoutId);
+        throw new Error(`Backend unavailable (${netErr.message || 'connection failed'})`);
       }
       if (!resp.ok) {
         // Only invalidate stored token on genuine auth-check failure (/api/auth/me)
@@ -2204,9 +2176,6 @@
           // Never redirect to login on 401
         } else if (resp.status === 401) {
           console.warn(`[ThermoSafe Debug] Secondary endpoint returned 401: ${endpoint}. Suppressing session logout.`);
-        }
-        if (resp.status >= 500) {
-          throw new Error('Backend service temporarily unavailable. Please try again.');
         }
         let errMsg = `Request failed: ${resp.status}`;
         try {
@@ -2228,17 +2197,12 @@
       return await resp.text();
     },
 
-    async checkHealth(timeoutMs = 6000) {
+    async checkHealth() {
       try {
-        const data = await this.request('/health', { timeout: timeoutMs }, 0);
-        return !!data && (data.status === 'ok' || data.status === 'healthy');
+        const data = await this.request('/api/health');
+        return data && data.status === 'ok';
       } catch (e) {
-        try {
-          const apiData = await this.request('/api/health', { timeout: Math.min(timeoutMs, 4000) }, 0);
-          return !!apiData && (apiData.status === 'ok' || apiData.status === 'healthy');
-        } catch (_) {
-          return false;
-        }
+        return false;
       }
     },
 
@@ -2365,20 +2329,8 @@
       });
     },
 
-    async getFirmsLive(days = 1) {
-      return await this.request(`/api/firms/live?days=${days}`);
-    },
-
-    async getFirmsHealth() {
-      return await this.request('/api/firms/health');
-    },
-
     async getSatelliteThermalEvents(mode = 'live', country = 'IND', days = 1) {
-      try {
-        return await this.request(`/api/firms/live?days=${days}`);
-      } catch (err) {
-        return await this.request(`/api/satellite/thermal-events?mode=${mode}&country=${country}&days=${days}`);
-      }
+      return await this.request(`/api/satellite/thermal-events?mode=${mode}&country=${country}&days=${days}`);
     },
 
     async getNearbyTeams(lat, lng, radiusKm = 100) {
@@ -3517,27 +3469,16 @@
 
     content.innerHTML = `
       <div class="dashboard-header-banner" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding:10px 16px;background:#FFFFFF;border:1px solid #D6E2EF;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.05);flex-wrap:wrap;gap:8px;">
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:10px;">
           <span style="font-weight:800;font-size:13px;color:#0B2545;letter-spacing:0.5px;">
             DATA SOURCE: <span id="dashSourceLabel" style="color:${getSourceLabelColor()};">${getSourceLabelText()}</span>
           </span>
           <span id="dashLiveStatus" style="font-size:11px;padding:2px 8px;border-radius:12px;background:${getLiveStatusBadgeInfo().bg};color:${getLiveStatusBadgeInfo().color};font-weight:700;">
-            ${getLiveStatusBadgeInfo().badge || getLiveStatusBadgeInfo().text}
-          </span>
-          <span id="dashLiveSubtext" style="font-size:11px;color:#92400E;font-style:italic;${getLiveStatusBadgeInfo().subtext ? '' : 'display:none;'}">
-            ${getLiveStatusBadgeInfo().subtext || ''}
-          </span>
-          <span id="dashHotspotsCount" style="font-size:11px;padding:2px 8px;border-radius:12px;background:#EFF6FF;color:#1D4ED8;font-weight:700;">
-            Hotspots: ${currentEvents.length}
+            ${getLiveStatusBadgeInfo().text}
           </span>
         </div>
-        <div style="display:flex;align-items:center;gap:12px;font-size:12px;color:#7A8699;">
-          <div>
-            LAST UPDATED: <span id="dashLastUpdated" style="font-weight:700;color:#0B2545;font-family:monospace;">${state.lastSuccessfulFirmsFetch ? state.lastSuccessfulFirmsFetch.toLocaleTimeString() : (state.lastSuccessfulFetch ? state.lastSuccessfulFetch.toLocaleTimeString() : (state.dataSource === 'demo' ? 'DEMO DATASET' : 'CONNECTING...'))}</span>
-          </div>
-          <button id="btnManualRefresh" class="btn btn-sm btn-outline" style="padding:3px 10px;font-size:11px;font-weight:700;height:26px;display:inline-flex;align-items:center;gap:4px;" onclick="window.__thermosafe.manualRefreshFirms()">
-            ↻ Refresh
-          </button>
+        <div style="font-size:12px;color:#7A8699;">
+          LAST UPDATED: <span id="dashLastUpdated" style="font-weight:700;color:#0B2545;font-family:monospace;">${state.lastSuccessfulFirmsFetch ? state.lastSuccessfulFirmsFetch.toLocaleTimeString() : (state.lastSuccessfulFetch ? state.lastSuccessfulFetch.toLocaleTimeString() : (state.dataState === 'DEMO_FALLBACK' ? 'DEMO DATASET' : 'CONNECTING...'))}</span>
         </div>
       </div>
 
@@ -3662,20 +3603,11 @@
       elSourceLabel.style.color = getSourceLabelColor();
     }
     const elLiveStatus = document.getElementById('dashLiveStatus');
-    const elLiveSubtext = document.getElementById('dashLiveSubtext');
     if (elLiveStatus) {
       const badge = getLiveStatusBadgeInfo();
-      elLiveStatus.textContent = badge.badge || badge.text;
+      elLiveStatus.textContent = badge.text;
       elLiveStatus.style.background = badge.bg;
       elLiveStatus.style.color = badge.color;
-      if (elLiveSubtext) {
-        elLiveSubtext.textContent = badge.subtext || '';
-        elLiveSubtext.style.display = badge.subtext ? 'inline' : 'none';
-      }
-    }
-    const elHotspots = document.getElementById('dashHotspotsCount');
-    if (elHotspots) {
-      elHotspots.textContent = `Hotspots: ${totalEvents}`;
     }
     const elLastUpdated = document.getElementById('dashLastUpdated');
     if (elLastUpdated) {
@@ -3683,7 +3615,7 @@
         elLastUpdated.textContent = state.lastSuccessfulFirmsFetch.toLocaleTimeString();
       } else if (state.lastSuccessfulFetch) {
         elLastUpdated.textContent = state.lastSuccessfulFetch.toLocaleTimeString();
-      } else if (state.dataSource === 'demo') {
+      } else if (state.dataState === 'DEMO_FALLBACK') {
         elLastUpdated.textContent = 'DEMO DATASET';
       } else if (state.dataState === 'CONNECTING') {
         elLastUpdated.textContent = 'CONNECTING...';
@@ -5518,21 +5450,16 @@ Explanation: ${ev.explanation}
     // Topbar Pill
     const pill = document.getElementById('backendPill');
     if (pill) {
-      if (state.dataSource === 'live' && state.backendConnected && state.dataState === 'LIVE') {
+      if (state.backendConnected) {
         pill.innerHTML = '● NASA FIRMS LIVE (INDIA)';
         pill.style.background = 'rgba(22,163,74,0.2)';
         pill.style.color = '#86EFAC';
         pill.style.borderColor = 'rgba(34,197,94,0.4)';
-      } else if (state.dataState === 'CONNECTING') {
-        pill.innerHTML = '● CONNECTING...';
-        pill.style.background = 'rgba(59,130,246,0.2)';
-        pill.style.color = '#93C5FD';
-        pill.style.borderColor = 'rgba(59,130,246,0.4)';
       } else {
-        pill.innerHTML = '● DATA SOURCE: DEMO DATA';
-        pill.style.background = 'rgba(202,138,4,0.2)';
-        pill.style.color = '#FDE047';
-        pill.style.borderColor = 'rgba(202,138,4,0.4)';
+        pill.innerHTML = '● NASA FIRMS UNAVAILABLE (INDIA)';
+        pill.style.background = 'rgba(239,68,68,0.2)';
+        pill.style.color = '#FCA5A5';
+        pill.style.borderColor = 'rgba(239,68,68,0.4)';
       }
     }
   }
@@ -5554,28 +5481,10 @@ Explanation: ${ev.explanation}
   function startLivePolling() {
     stopLivePolling();
     state.livePollingActive = true;
-    // Controlled refresh interval: Refresh every 10 minutes (600,000 ms) as specified
     livePollingInterval = setInterval(async () => {
       if (state.dataSource !== 'live') return;
       await fetchLiveData(true); // silent refresh
-    }, 10 * 60 * 1000);
-  }
-
-  async function manualRefreshFirms() {
-    const btn = document.getElementById('btnManualRefresh');
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = '↻ Syncing...';
-    }
-    try {
-      showToast('NASA FIRMS Refresh', 'Fetching latest VIIRS Near-Real-Time observations...', 'low');
-      await fetchLiveData(false);
-    } finally {
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = '↻ Refresh';
-      }
-    }
+    }, 30000);
   }
 
   async function fetchLiveData(silent = false) {
@@ -5588,9 +5497,13 @@ Explanation: ${ev.explanation}
       updateDataSourceUI();
 
       if (!isHealthy) {
-        const backendOfflineMsg = 'Live backend temporarily unavailable — displaying demonstration data.';
-        state.lastApiError = backendOfflineMsg;
-        activateDemoFallback(backendOfflineMsg);
+        state.lastApiError = 'Backend unreachable';
+        if (state.dataState !== 'LIVE' || LIVE_DATA.events.length === 0) {
+          activateDemoFallback('FastAPI backend offline or unreachable');
+        } else {
+          state.firmsState = 'LIVE_STALE';
+          if (state.currentPage === 'dashboard') updateDashboardLiveView();
+        }
         updateDebugDiagnostics();
         return;
       }
@@ -5603,49 +5516,61 @@ Explanation: ${ev.explanation}
         if (reqId !== state.liveFetchRequestId) return;
         if (satResp) {
           state.satelliteTelemetry = satResp;
-          const rawEvents = satResp.data || satResp.events || satResp.items || [];
-          const isSuccess = satResp.success === true || satResp.status === 'success' || satResp.status === 'ok';
-          const isLive = satResp.live === true || satResp.connected === true;
+          const rawEvents = satResp.events || satResp.items || [];
+          const statusVal = satResp.status || satResp.status_code || (satResp.connected ? 'LIVE_CONNECTED' : 'LIVE_STALE');
 
-          if (satResp.last_successful_fetch || satResp.last_updated) {
-            state.lastSuccessfulFirmsFetch = new Date(satResp.last_successful_fetch || satResp.last_updated);
+          if (satResp.last_successful_fetch) {
+            state.lastSuccessfulFirmsFetch = new Date(satResp.last_successful_fetch);
           }
 
-          if (isSuccess && isLive) {
+          if (statusVal === 'LIVE_OK_ZERO_EVENTS') {
             state.dataState = 'LIVE';
-            state.firmsState = satResp.status === 'LIVE_STALE' ? 'LIVE_STALE' : 'LIVE_CONNECTED';
-            state.lastSuccessfulFirmsEventCount = rawEvents.length;
+            state.firmsState = 'LIVE_CONNECTED';
+            state.lastSuccessfulFirmsEventCount = 0;
             state.lastFirmsError = null;
-            state.lastApiError = null;
-            state.lastSuccessfulFetch = new Date();
+            state.liveStatusMessage = satResp.message || '● NASA FIRMS LIVE (0 active hotspots)';
+            LIVE_DATA.events = [];
+            currentEvents = LIVE_DATA.events;
+          } else if (rawEvents.length > 0) {
+            const wasFallback = (state.dataState === 'DEMO_FALLBACK');
+            state.dataState = 'LIVE';
+            state.firmsState = statusVal === 'LIVE_STALE' ? 'LIVE_STALE' : 'LIVE_CONNECTED';
+            state.lastSuccessfulFirmsEventCount = rawEvents.length;
+            state.lastFirmsError = satResp.error || null;
+            state.liveStatusMessage = satResp.message || (state.firmsState === 'LIVE_STALE' ? `● NASA FIRMS LIVE — STALE (${state.lastSuccessfulFirmsFetch ? state.lastSuccessfulFirmsFetch.toLocaleTimeString() : 'Cached'})` : '● NASA FIRMS LIVE');
             LIVE_DATA.events = rawEvents.map(mapBackendEvent);
             currentEvents = LIVE_DATA.events;
-
-            if (rawEvents.length === 0) {
-              state.liveStatusMessage = satResp.message || '● NASA FIRMS LIVE (0 active hotspots)';
-            } else {
-              state.liveStatusMessage = satResp.message || (state.firmsState === 'LIVE_STALE' ? `● NASA FIRMS LIVE — CACHED (${state.lastSuccessfulFirmsFetch ? state.lastSuccessfulFirmsFetch.toLocaleTimeString() : 'Recent'})` : '● NASA FIRMS LIVE');
-            }
-
+            state.lastSuccessfulFetch = new Date();
             if (state.currentPage === 'dashboard') {
               updateDashboardLiveView();
             } else {
               renderMarkers();
               if (state.currentPage === 'incidents') renderIncidentsPage();
             }
-
             console.log(`[ThermoSafe FIRMS] Telemetry synchronized: count=${rawEvents.length} state=${state.firmsState}`);
-            if (!silent) {
-              showToast('NASA FIRMS Live Connected', `Synchronized ${rawEvents.length} active live thermal hotspots.`, 'low');
+            if (wasFallback && !silent) {
+              showToast('NASA FIRMS Live Connected', `Synchronized ${rawEvents.length} active live thermal events.`, 'low');
             }
           } else {
-            const safeError = satResp.error || satResp.message || 'NASA FIRMS service temporarily unavailable.';
-            activateFirmsUnavailable(safeError);
+            state.lastFirmsError = satResp.error || satResp.message || '';
+if (state.dataState !== 'LIVE' ||
+    LIVE_DATA.events.length === 0) {
+  activateDemoFallback(satResp.message ||
+    'NASA FIRMS returned 0 events or requires configuration');
+} else {
+  state.firmsState = 'LIVE_STALE';
+}
+            }
           }
         }
       } catch (satErr) {
         console.warn('[ThermoSafe FIRMS] Live satellite telemetry fetch error:', satErr);
-        activateFirmsUnavailable(satErr.message || 'NASA FIRMS service temporarily unavailable.');
+        state.lastFirmsError = satErr.message || 'Fetch error';
+        if (state.dataState !== 'LIVE' || LIVE_DATA.events.length === 0) {
+          activateDemoFallback(satErr.message || 'Live satellite telemetry unavailable');
+        } else {
+          state.firmsState = 'LIVE_STALE';
+        }
       }
 
       // 1b. Fetch thermal events from backend database (ensures DB synchronization)
@@ -5801,30 +5726,11 @@ Explanation: ${ev.explanation}
   }
 
   async function setDataSource(source, skipToast = false) {
-    if (source === 'demo') {
-      state.dataSource = 'demo';
-      state.dataState = 'DEMO';
-      state.firmsState = 'DEMO';
-      currentEvents = DEMO_DATA.events;
-      currentFacilities = DEMO_DATA.facilities;
-      state.notifications = DEMO_DATA.notifications;
-      stopLivePolling();
-      updateDataSourceUI();
-      if (state.currentPage === 'dashboard') {
-        updateDashboardLiveView();
-      } else {
-        renderMarkers();
-        if (state.showFacilities) renderFacilities();
-        if (state.currentPage === 'incidents') renderIncidentsPage();
-      }
-      if (!skipToast) {
-        showToast('Demo Mode Activated', 'Displaying simulated test dataset.', 'low');
-      }
-      return;
-    }
-
-    // Switch to LIVE mode: Production default
+    // ThermoSafe operates strictly in India-only live NASA FIRMS mode.
     state.dataSource = 'live';
+    const reqId = ++state.liveFetchRequestId;
+    updateDataSourceUI();
+
     state.dataState = LIVE_DATA.events.length > 0 ? 'LIVE' : 'CONNECTING';
     currentEvents = LIVE_DATA.events;
     currentFacilities = LIVE_DATA.facilities.length > 0 ? LIVE_DATA.facilities : currentFacilities;
@@ -5833,8 +5739,10 @@ Explanation: ${ev.explanation}
     if (LIVE_DATA.reports) state.backendReports = LIVE_DATA.reports;
     if (LIVE_DATA.operatorTeams) state.operatorTeams = LIVE_DATA.operatorTeams;
 
-    updateDataSourceUI();
     startLivePolling();
+    if (!skipToast && source === 'demo') {
+      showToast('Live Mode Permanent', 'ThermoSafe operates strictly in India-only live NASA FIRMS mode.', 'low');
+    }
     await fetchLiveData(skipToast);
 
     renderDrawer();
@@ -6007,7 +5915,6 @@ Explanation: ${ev.explanation}
     fetchLiveData,
     stopLivePolling,
     startLivePolling,
-    manualRefreshFirms,
     updateDashboardLiveView,
     updateDebugDiagnostics,
     renderAuthInitializingState,
@@ -6080,11 +5987,27 @@ Explanation: ${ev.explanation}
     }
   }
 
+  let startupFallbackTimer = null;
+
   function startPolling() {
     if (state.dataSource === 'live') {
       startLivePolling();
-      fetchLiveData(true).catch(() => {
-        activateFirmsUnavailable('FastAPI backend connection error');
+      if (startupFallbackTimer) clearTimeout(startupFallbackTimer);
+      // Fast startup guarantee: 4.5s max wait for satellite feed before loading deterministic demo events
+      startupFallbackTimer = setTimeout(() => {
+        if (state.dataState === 'CONNECTING' || (state.dataSource === 'live' && currentEvents.length === 0 && state.dataState !== 'LIVE')) {
+          console.warn('[ThermoSafe] Fast startup timeout (4.5s) reached. Activating demo fallback.');
+          activateDemoFallback('Live telemetry connection pending or > 4.5s');
+        }
+      }, 4500);
+
+      fetchLiveData(true).then(() => {
+        if (startupFallbackTimer) clearTimeout(startupFallbackTimer);
+      }).catch(() => {
+        if (startupFallbackTimer) clearTimeout(startupFallbackTimer);
+        if (state.dataState !== 'LIVE' || currentEvents.length === 0) {
+          activateDemoFallback('Live fetch encountered network error');
+        }
       });
     }
   }

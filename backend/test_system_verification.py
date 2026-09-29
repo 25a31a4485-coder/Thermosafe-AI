@@ -35,13 +35,13 @@ def test_a_backend_health():
     assert r1.status_code == 200, f"/health failed: {r1.status_code}"
     d1 = r1.json()
     assert d1.get("status") == "ok", f"Expected status 'ok', got {d1}"
-    assert "service" in d1
     print("PASS: GET /health returns 200 OK with status: ok")
 
     r2 = client.get("/api/health")
     assert r2.status_code == 200, f"/api/health failed: {r2.status_code}"
     d2 = r2.json()
     assert d2.get("status") == "ok"
+    assert "service" in d2
     print("PASS: GET /api/health returns 200 OK with status: ok")
 
 def test_b_cors_configuration():

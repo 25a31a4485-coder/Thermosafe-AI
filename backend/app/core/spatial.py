@@ -8,12 +8,12 @@ from typing import Tuple
 # Latitudes:  6.0° N to 37.5° N
 # Longitudes: 68.0° E to 97.5° E
 INDIA_LAT_MIN: float = 6.0
-INDIA_LAT_MAX: float = 37.5
+INDIA_LAT_MAX: float = 37.0
 INDIA_LON_MIN: float = 68.0
-INDIA_LON_MAX: float = 97.5
+INDIA_LON_MAX: float = 97.0
 
-# Bounding box formatted for NASA FIRMS area CSV API (min_lon,min_lat,max_lon,max_lat)
-INDIA_BBOX_CSV: str = f"{INDIA_LON_MIN},{INDIA_LAT_MIN},{INDIA_LON_MAX},{INDIA_LAT_MAX}"
+# Bounding box formatted for NASA FIRMS area CSV API (min_lon,min_lat,max_lon,max_lat: west,south,east,north)
+INDIA_BBOX_CSV: str = "68,6,97,37"
 INDIA_COUNTRY_CODE: str = "IND"
 
 

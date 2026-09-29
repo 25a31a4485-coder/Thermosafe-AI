@@ -20,6 +20,7 @@ from app.routers.facilities import router as facilities_router
 from app.routers.ai import router as ai_router
 from app.routers.risk import router as risk_router
 from app.routers.satellite import router as satellite_router
+from app.routers.firms import router as firms_router
 from app.routers.alerts import router as alerts_router
 from app.routers.analytics import router as analytics_router
 from app.routers.reports import router as reports_router
@@ -65,7 +66,9 @@ app = FastAPI(
 # When allow_credentials=True, browsers reject wildcard "*", so we filter "*" and allow regex/explicit list.
 _raw_origins = settings.CORS_ORIGINS if isinstance(settings.CORS_ORIGINS, list) else [settings.CORS_ORIGINS]
 _cors_origins = [o.rstrip("/") for o in _raw_origins if o and o != "*"]
-for _dev_origin in [
+for _allowed_origin in [
+    "https://thermosafe-ai-2.onrender.com",
+    "https://thermosafe-ai.onrender.com",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
     "http://localhost:5500",
@@ -76,8 +79,8 @@ for _dev_origin in [
     "http://127.0.0.1:3000",
     "null",
 ]:
-    if _dev_origin not in _cors_origins:
-        _cors_origins.append(_dev_origin)
+    if _allowed_origin not in _cors_origins:
+        _cors_origins.append(_allowed_origin)
 
 app.add_middleware(
     CORSMiddleware,
@@ -96,6 +99,7 @@ app.include_router(facilities_router, prefix=settings.API_PREFIX)
 app.include_router(ai_router, prefix=settings.API_PREFIX)
 app.include_router(risk_router, prefix=settings.API_PREFIX)
 app.include_router(satellite_router, prefix=settings.API_PREFIX)
+app.include_router(firms_router, prefix=settings.API_PREFIX)
 app.include_router(alerts_router, prefix=settings.API_PREFIX)
 app.include_router(analytics_router, prefix=settings.API_PREFIX)
 app.include_router(reports_router, prefix=settings.API_PREFIX)
@@ -106,27 +110,34 @@ app.include_router(devices_router, prefix=settings.API_PREFIX)
 @app.get("/health", tags=["Health"])
 async def health_root():
     """
-    Root health check endpoint returning service status and FIRMS worker telemetry.
+    Lightweight root health check endpoint to verify backend service reachability.
+    Does not require NASA FIRMS or database connectivity.
     """
-    firms = get_firms_service()
     return {
-        "status": "ok",
-        "service": "ThermoSafe AI backend",
-        "firms": firms.get_health_status()
+        "status": "ok"
     }
 
 
 @app.get("/api/health", tags=["Health"])
 async def health_check():
     """
-    Health check endpoint to verify backend service status and FIRMS worker telemetry.
+    Health check endpoint returning service status and FIRMS worker telemetry.
+    Safe against internal exceptions.
     """
-    firms = get_firms_service()
-    return {
+    res = {
         "status": "ok",
-        "service": "ThermoSafe AI backend",
-        "firms": firms.get_health_status()
+        "service": "ThermoSafe AI backend"
     }
+    try:
+        firms = get_firms_service()
+        res["firms"] = firms.get_health_status()
+    except Exception as exc:
+        res["firms"] = {
+            "firms_configured": False,
+            "status": "UNAVAILABLE",
+            "last_error": str(exc)
+        }
+    return res
 
 
 @app.get("/api/firms/status", tags=["Satellite Telemetry (NASA FIRMS)"])

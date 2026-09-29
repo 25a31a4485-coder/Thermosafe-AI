@@ -200,7 +200,7 @@ class FIRMSService:
     @property
     def is_configured(self) -> bool:
         """Check whether a non-placeholder MAP_KEY is present."""
-        raw_key = settings.effective_firms_map_key
+        raw_key = self.api_key
         return bool(raw_key and raw_key not in ["", "your-nasa-firms-map-key"])
 
     # =========================================================================
@@ -218,10 +218,10 @@ class FIRMSService:
         Never leaks MAP_KEY in logs, exceptions, or error messages.
         """
         # 1. Verify Configuration
-        current_key = settings.effective_firms_map_key
-        if not current_key:
+        current_key = self.api_key
+        if not current_key or current_key in ["", "your-nasa-firms-map-key"]:
             self.last_diagnostic_reason = "missing_api_key"
-            return (False, None, "NASA FIRMS API key is not configured in backend/.env", None, "missing_api_key")
+            return (False, None, "NASA FIRMS MAP_KEY is not configured on the server.", None, "missing_api_key")
 
         self.api_key = current_key
 
@@ -279,17 +279,17 @@ class FIRMSService:
                     first_line = csv_text.strip().split("\n")[0] if csv_text else ""
                     if "Invalid MAP_KEY" in first_line:
                         last_reason = "invalid_api_key"
-                        last_error = "NASA FIRMS API rejected key: Invalid MAP_KEY"
+                        last_error = "NASA FIRMS authentication failed. Check MAP_KEY."
                         self.last_diagnostic_reason = last_reason
                         return (False, None, last_error, 200, last_reason)
-                    elif "Transaction limit" in first_line:
+                    elif "Transaction limit" in first_line or "rate limit" in first_line.lower():
+                        last_reason = "rate_limited"
+                        last_error = "NASA FIRMS rate limit reached."
+                        self.last_diagnostic_reason = last_reason
+                        return (False, None, last_error, 200, last_reason)
+                    elif "Invalid API call" in first_line or "Not Found" in first_line:
                         last_reason = "temporary_service_failure"
-                        last_error = "NASA FIRMS transaction limit exceeded"
-                        self.last_diagnostic_reason = last_reason
-                        return (False, None, last_error, 200, last_reason)
-                    elif "Invalid API call" in first_line:
-                        last_reason = "http_error"
-                        last_error = f"NASA FIRMS API rejected: {first_line.strip()}"
+                        last_error = "NASA FIRMS service temporarily unavailable."
                         self.last_diagnostic_reason = last_reason
                         return (False, None, last_error, 200, last_reason)
 
@@ -297,21 +297,23 @@ class FIRMSService:
                     self.last_diagnostic_reason = None
                     return (True, csv_text, None, 200, None)
                 else:
-                    last_error = f"FIRMS HTTP {status_code}"
+                    last_error = "NASA FIRMS service temporarily unavailable."
                     last_reason = "http_error"
 
             except urllib.error.HTTPError as he:
                 last_status = he.code
-                last_reason = "invalid_api_key" if he.code in (401, 403) else ("temporary_service_failure" if he.code in (429, 502, 503, 504) else "http_error")
-                err_body = ""
-                try:
-                    err_body = he.read().decode("utf-8", errors="replace").strip().split("\n")[0]
-                except Exception:
-                    pass
-                detail = f" - {err_body}" if err_body else ""
-                sanitized_err = mask_secret(f"FIRMS HTTP {he.code}{detail}", self.api_key)
-                logger.warning("NASA FIRMS HTTP Error: %s (sensor=%s)", sanitized_err, sensor)
-                last_error = sanitized_err
+                if he.code in (401, 403):
+                    last_reason = "invalid_api_key"
+                    last_error = "NASA FIRMS authentication failed. Check MAP_KEY."
+                elif he.code == 429:
+                    last_reason = "rate_limited"
+                    last_error = "NASA FIRMS rate limit reached."
+                else:
+                    last_reason = "temporary_service_failure"
+                    last_error = "NASA FIRMS service temporarily unavailable."
+                
+                sanitized_err = mask_secret(f"FIRMS HTTP {he.code}", self.api_key)
+                logger.warning("NASA FIRMS HTTP Error: %s (sensor=%s): %s", sanitized_err, sensor, last_error)
 
                 # If primary sensor 404, try next candidate
                 if he.code == 404 and sensor != candidates[-1]:
@@ -322,30 +324,26 @@ class FIRMSService:
             except (socket.timeout, TimeoutError) as te:
                 sanitized_err = mask_secret(f"Remote NASA server timeout ({te})", self.api_key)
                 logger.warning("NASA FIRMS timeout: %s", sanitized_err)
-                last_error = "Remote NASA server connection timeout"
+                last_error = "NASA FIRMS service temporarily unavailable."
                 last_reason = "upstream_timeout"
                 break
 
             except urllib.error.URLError as ue:
-                if isinstance(ue.reason, (socket.timeout, TimeoutError)):
-                    last_error = "Remote NASA server connection timeout"
-                    last_reason = "upstream_timeout"
-                else:
-                    sanitized_err = mask_secret(f"URLError: {ue.reason}", self.api_key)
-                    logger.warning("NASA FIRMS network failure: %s", sanitized_err)
-                    last_error = "Remote NASA server unreachable"
-                    last_reason = "network_failure"
+                sanitized_err = mask_secret(f"URLError: {ue.reason}", self.api_key)
+                logger.warning("NASA FIRMS network failure: %s", sanitized_err)
+                last_error = "NASA FIRMS service temporarily unavailable."
+                last_reason = "network_failure"
                 break
 
             except Exception as ex:
                 sanitized_err = mask_secret(f"{type(ex).__name__}: {ex}", self.api_key)
                 logger.error("Unexpected error contacting NASA FIRMS: %s", sanitized_err)
-                last_error = "Unexpected NASA FIRMS connection failure"
-                last_reason = "network_failure"
+                last_error = "NASA FIRMS service temporarily unavailable."
+                last_reason = "temporary_service_failure"
                 break
 
-        self.last_diagnostic_reason = last_reason or "http_error"
-        return (False, None, last_error or "NASA FIRMS request failed", last_status, self.last_diagnostic_reason)
+        self.last_diagnostic_reason = last_reason or "temporary_service_failure"
+        return (False, None, last_error or "NASA FIRMS service temporarily unavailable.", last_status, self.last_diagnostic_reason)
 
     # =========================================================================
     # STEP 2: VALIDATE FIRMS RESPONSE
@@ -362,12 +360,12 @@ class FIRMSService:
         first_line = csv_text.strip().split("\n")[0]
         # Detect textual rejections from NASA API
         if "Invalid MAP_KEY" in first_line:
-            return (False, "NASA FIRMS API rejected: Invalid MAP_KEY", "invalid_api_key")
-        if "Transaction limit" in first_line:
-            return (False, "NASA FIRMS transaction limit exceeded", "temporary_service_failure")
+            return (False, "NASA FIRMS authentication failed. Check MAP_KEY.", "invalid_api_key")
+        if "Transaction limit" in first_line or "rate limit" in first_line.lower():
+            return (False, "NASA FIRMS rate limit reached.", "rate_limited")
         for reject_phrase in ["Invalid API call", "Not Found"]:
             if reject_phrase in first_line:
-                return (False, f"NASA FIRMS API rejected: {first_line.strip()}", "http_error")
+                return (False, "NASA FIRMS service temporarily unavailable.", "temporary_service_failure")
 
         # Ensure header contains expected columns
         header_lower = first_line.lower()
@@ -907,6 +905,12 @@ class FIRMSService:
 
         # LIVE MODE: Serve from canonical database cache
         cached_events = self.get_cached_live_events(db=db, limit=100)
+
+        # If cache is empty and configured, trigger immediate live fetch
+        if len(cached_events) == 0 and self.is_configured and not self.circuit_breaker_open:
+            self.ingest_live_telemetry(source=source, days=days, db=db)
+            cached_events = self.get_cached_live_events(db=db, limit=100)
+
         stale_age = self._calculate_stale_age()
         now_iso = datetime.now(timezone.utc).isoformat()
         last_success_iso = self.last_successful_fetch.isoformat() if self.last_successful_fetch else None
@@ -937,7 +941,9 @@ class FIRMSService:
             status_code = "CONFIGURATION_REQUIRED"
             connected = False
             live_connected = False
-            msg = "NASA FIRMS API key is not configured in backend/.env."
+            msg = "NASA FIRMS MAP_KEY is not configured on the server."
+            self.last_error = msg
+            self.last_diagnostic_reason = "missing_api_key"
         else:
             status_val = "LIVE_UNAVAILABLE"
             status_code = "LIVE_UNAVAILABLE"
@@ -945,11 +951,16 @@ class FIRMSService:
             live_connected = False
             msg = "DATA SOURCE: NASA FIRMS UNAVAILABLE (India Scope Active)"
 
+        is_success = connected or (status_code == "LIVE_OK_ZERO_EVENTS")
+        is_live = live_connected or (status_code == "LIVE_OK_ZERO_EVENTS")
+
         return SatelliteThermalEventsResponse(
             mode="live",
             source=f"NASA FIRMS ({source})",
             connected=connected,
             live_connected=live_connected,
+            success=is_success,
+            live=is_live,
             status=status_val,
             status_code=status_code,
             last_updated=last_success_iso or now_iso,
@@ -957,13 +968,165 @@ class FIRMSService:
             next_refresh=next_refresh_iso,
             stale_age_seconds=stale_age,
             event_count=len(cached_events),
+            count=len(cached_events),
             total=len(cached_events),
             message=msg,
-            error=self.last_error,
+            error=self.last_error if not connected else None,
             reason=self.last_diagnostic_reason,
+            data=cached_events,
             items=cached_events,
             events=cached_events,
         )
+
+    def _get_db_event_count(self) -> int:
+        """Count active live India events in the database cache."""
+        try:
+            with SessionLocal() as db:
+                return (
+                    db.query(ThermalEvent)
+                    .filter(
+                        ThermalEvent.is_demo == False,
+                        ThermalEvent.latitude >= INDIA_LAT_MIN,
+                        ThermalEvent.latitude <= INDIA_LAT_MAX,
+                        ThermalEvent.longitude >= INDIA_LON_MIN,
+                        ThermalEvent.longitude <= INDIA_LON_MAX,
+                    )
+                    .count()
+                )
+        except Exception:
+            return 0
+
+    def get_firms_health_summary(self) -> Dict[str, Any]:
+        """
+        Returns clean, safe NASA FIRMS health status satisfying Section 12 requirements:
+        {
+          "service": "NASA FIRMS",
+          "configured": bool,
+          "reachable": bool,
+          "live": bool
+        }
+        Never returns MAP_KEY.
+        """
+        configured = self.is_configured
+        reachable = False
+        live = False
+
+        if configured:
+            if self.last_status in ("LIVE_CURRENT", "LIVE_OK_ZERO_EVENTS"):
+                reachable = True
+                live = True
+            elif self.last_status == "LIVE_STALE":
+                reachable = not self.circuit_breaker_open
+                live = True
+            elif not self.circuit_breaker_open and self.last_diagnostic_reason not in ("network_failure", "invalid_api_key"):
+                reachable = True
+                live = False
+
+        return {
+            "service": "NASA FIRMS",
+            "configured": configured,
+            "reachable": reachable,
+            "live": live,
+            "status": self.last_status,
+            "sensor": self.preferred_sensor,
+            "cached_event_count": self._get_db_event_count(),
+            "last_successful_fetch": self.last_successful_fetch.isoformat() if self.last_successful_fetch else None,
+            "last_error": self.last_error,
+        }
+
+    def get_firms_live_payload(
+        self,
+        days: int = 1,
+        source: Optional[str] = None,
+        min_confidence: Optional[float] = None,
+        db: Optional[Session] = None,
+    ) -> Dict[str, Any]:
+        """
+        Direct NASA FIRMS Live Telemetry Controller satisfying Section 5 requirements:
+        1. Reads FIRMS MAP_KEY from environment variables.
+        2. Calls NASA FIRMS (or serves warm canonical cache).
+        3. Checks HTTP response.
+        4. Parses CSV safely.
+        5. Converts records into expected JSON format.
+        6. Filters strictly to India.
+        7. Returns:
+           {
+             "success": true,
+             "source": "NASA FIRMS",
+             "live": true,
+             "count": <number>,
+             "data": [...]
+           }
+        """
+        if not self.is_configured:
+            return {
+                "success": False,
+                "source": "NASA FIRMS",
+                "live": False,
+                "count": 0,
+                "data": [],
+                "events": [],
+                "items": [],
+                "error": "NASA FIRMS MAP_KEY is not configured on the server.",
+                "reason": "missing_api_key",
+                "status": "CONFIGURATION_REQUIRED",
+                "message": "NASA FIRMS MAP_KEY is not configured on the server."
+            }
+
+        cached_events = self.get_cached_live_events(db=db, limit=100)
+
+        # If cache is empty, trigger immediate synchronous live fetch
+        if len(cached_events) == 0 and not self.circuit_breaker_open:
+            self.ingest_live_telemetry(source=source, days=days, db=db)
+            cached_events = self.get_cached_live_events(db=db, limit=100)
+
+        data_list = [e.model_dump() if hasattr(e, "model_dump") else (e.dict() if hasattr(e, "dict") else e) for e in cached_events]
+
+        if min_confidence is not None:
+            data_list = [d for d in data_list if (d.get("confidence") or 0.0) >= min_confidence]
+
+        if self.last_status == "LIVE_OK_ZERO_EVENTS" or (len(data_list) == 0 and self.last_successful_fetch):
+            return {
+                "success": True,
+                "source": "NASA FIRMS",
+                "live": True,
+                "count": 0,
+                "data": [],
+                "events": [],
+                "items": [],
+                "last_updated": self.last_successful_fetch.isoformat() if self.last_successful_fetch else datetime.now(timezone.utc).isoformat(),
+                "status": "LIVE_OK_ZERO_EVENTS",
+                "message": "DATA SOURCE: NASA FIRMS LIVE (0 active thermal hotspots returned for India)"
+            }
+
+        if len(data_list) > 0:
+            return {
+                "success": True,
+                "source": "NASA FIRMS",
+                "live": True,
+                "count": len(data_list),
+                "data": data_list,
+                "events": data_list,
+                "items": data_list,
+                "last_updated": self.last_successful_fetch.isoformat() if self.last_successful_fetch else datetime.now(timezone.utc).isoformat(),
+                "status": self.last_status or "LIVE_CURRENT",
+                "message": f"DATA SOURCE: NASA FIRMS LIVE ({len(data_list)} active detections synchronized - India Only)"
+            }
+
+        error_msg = self.last_error or "NASA FIRMS service temporarily unavailable."
+        return {
+            "success": False,
+            "source": "NASA FIRMS",
+            "live": False,
+            "count": 0,
+            "data": [],
+            "events": [],
+            "items": [],
+            "error": error_msg,
+            "reason": self.last_diagnostic_reason or "temporary_service_failure",
+            "status": "LIVE_UNAVAILABLE",
+            "message": f"NASA FIRMS UNAVAILABLE: {error_msg}"
+        }
 
     # =========================================================================
     # STEP 8: DEMO DATA GENERATION (ISOLATED TO DEMO MODE)
@@ -1044,6 +1207,8 @@ class FIRMSService:
             source="Local Demonstration Satellite Feed (VIIRS Model)",
             connected=False,
             live_connected=False,
+            success=True,
+            live=False,
             status="DEMO_MODE",
             status_code="DEMO_MODE",
             last_updated=now.isoformat(),
@@ -1051,9 +1216,11 @@ class FIRMSService:
             next_refresh=None,
             stale_age_seconds=None,
             event_count=len(items),
+            count=len(items),
             total=len(items),
             message="Demonstration satellite telemetry active (Simulating VIIRS passes over major industrial hubs)",
             error=None,
+            data=items,
             items=items,
             events=items,
         )

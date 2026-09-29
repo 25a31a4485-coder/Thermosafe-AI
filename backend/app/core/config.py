@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     SATELLITE_DATA_MODE: str = "live"  # Primary default is now "live"
     FIRMS_MAP_KEY: Optional[str] = None
     NASA_FIRMS_API_KEY: Optional[str] = None
+    NASA_FIRMS_MAP_KEY: Optional[str] = None
+    FIRMS_API_KEY: Optional[str] = None
+    MAP_KEY: Optional[str] = None
     NASA_FIRMS_BASE_URL: str = "https://firms.modaps.eosdis.nasa.gov"
     NASA_FIRMS_TIMEOUT_SECONDS: int = 30
     FIRMS_REFRESH_INTERVAL_SECONDS: int = 900  # 15 minutes default background refresh
@@ -61,11 +64,27 @@ class Settings(BaseSettings):
         Resolves the NASA FIRMS Map Key with strict canonical precedence:
         1. FIRMS_MAP_KEY (canonical primary variable)
         2. NASA_FIRMS_API_KEY (backward-compatible fallback)
+        3. NASA_FIRMS_MAP_KEY
+        4. FIRMS_API_KEY
+        5. MAP_KEY
+        Also directly inspects os.environ for immediate visibility on cloud runtimes like Render.
         """
-        for candidate in [self.FIRMS_MAP_KEY, self.NASA_FIRMS_API_KEY]:
+        candidates = [
+            self.FIRMS_MAP_KEY,
+            self.NASA_FIRMS_API_KEY,
+            self.NASA_FIRMS_MAP_KEY,
+            self.FIRMS_API_KEY,
+            self.MAP_KEY,
+            os.environ.get("FIRMS_MAP_KEY"),
+            os.environ.get("NASA_FIRMS_API_KEY"),
+            os.environ.get("NASA_FIRMS_MAP_KEY"),
+            os.environ.get("FIRMS_API_KEY"),
+            os.environ.get("MAP_KEY"),
+        ]
+        for candidate in candidates:
             if candidate and isinstance(candidate, str):
                 cleaned = candidate.strip().strip('"').strip("'")
-                if cleaned and cleaned not in ["your-nasa-firms-map-key", '""', "''"]:
+                if cleaned and cleaned not in ["your-nasa-firms-map-key", '""', "''", "none", "null"]:
                     return cleaned
         return None
 

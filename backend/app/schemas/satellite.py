@@ -24,6 +24,10 @@ class SatelliteThermalEventsResponse(BaseModel):
     last_successful_fetch: Optional[str] = Field(None, description="ISO timestamp of last successful NASA FIRMS fetch")
     next_refresh: Optional[str] = Field(None, description="ISO timestamp of next scheduled NASA FIRMS refresh")
     stale_age_seconds: Optional[int] = Field(None, description="Seconds elapsed since last successful NASA fetch")
+    success: bool = Field(default=True, description="Whether the telemetry request was successful")
+    live: bool = Field(default=True, description="True if telemetry represents real NASA FIRMS data")
+    count: int = Field(default=0, ge=0, description="Total count of satellite thermal events returned")
+    data: List[ThermalEventResponse] = Field(default_factory=list, description="List of thermal events (canonical data array)")
     items: List[ThermalEventResponse] = Field(default_factory=list, description="Normalized thermal events with map-compatible GeoJSON")
     events: List[ThermalEventResponse] = Field(default_factory=list, description="Alias for items list")
 
