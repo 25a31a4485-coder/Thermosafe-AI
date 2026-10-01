@@ -6,7 +6,24 @@
 <title>THERMOSAFE AI — Industrial Thermal Intelligence</title>
 
 <!-- Leaflet CSS -->
+<!-- Leaflet CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+<!-- Early Global Error Boundary: Prevents Blank Screen on Script Failure -->
+<script>
+  window.addEventListener('error', function (e) {
+    console.error('[ThermoSafe Early ErrorBoundary]', e.message, e.filename, e.lineno);
+    var contentEl = document.getElementById('content');
+    if (contentEl && (!contentEl.children || contentEl.children.length === 0 || !document.getElementById('dashSourceLabel'))) {
+      contentEl.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:calc(100vh - 120px);text-align:center;padding:40px;font-family:sans-serif;">' +
+        '<div style="font-size:44px;margin-bottom:14px;">⚠️</div>' +
+        '<div style="font-size:20px;font-weight:800;color:#0B2545;margin-bottom:8px;">Something went wrong loading ThermoSafe AI.</div>' +
+        '<div style="font-size:13px;color:#64748B;margin-bottom:20px;max-width:440px;line-height:1.5;">' + (e.message || 'Unable to initialize dashboard.') + '</div>' +
+        '<button onclick="window.location.reload()" style="background:#1E5AA8;color:#FFF;border:none;padding:10px 24px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;box-shadow:0 2px 6px rgba(11,37,69,0.15);">Reload Dashboard</button>' +
+        '</div>';
+    }
+  });
+</script>
 
 <!-- Formal serif font -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -718,7 +735,14 @@
       </button>
     </aside>
 
-    <div class="content" id="content"></div>
+        <div class="content" id="content">
+      <div id="initialLoader" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:calc(100vh - 120px);min-height:400px;text-align:center;padding:40px;">
+        <div style="width:48px;height:48px;border:4px solid #D6E2EF;border-top-color:#1E5AA8;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:20px;"></div>
+        <div style="font-size:20px;font-weight:800;color:#0B2545;letter-spacing:-0.3px;margin-bottom:8px;">THERMOSAFE AI</div>
+        <div style="font-size:13px;color:#4A5568;font-weight:600;margin-bottom:6px;">Industrial Thermal Intelligence Platform</div>
+        <div style="font-size:12px;color:#7A8699;">Initializing secure session & satellite telemetry...</div>
+      </div>
+    </div>
   </div>
 
   <nav class="mobile-nav">
@@ -838,6 +862,74 @@
 
 (function () {
   'use strict';
+
+  // Application-level Global Error Boundaries
+  window.addEventListener('error', function (e) {
+    console.error('[ThermoSafe App ErrorBoundary] Uncaught runtime exception:', e.error || e.message);
+    const contentEl = document.getElementById('content');
+    if (contentEl && (!contentEl.children || contentEl.children.length === 0)) {
+      renderEmergencyFallbackDashboard(e.error ? e.error.message : e.message);
+    }
+  });
+
+  window.addEventListener('unhandledrejection', function (e) {
+    console.warn('[ThermoSafe App ErrorBoundary] Unhandled Promise Rejection:', e.reason);
+  });
+
+  function renderSafeModule(moduleName, renderFn) {
+    try {
+      return renderFn();
+    } catch (err) {
+      console.error(`[ThermoSafe ErrorBoundary] Failed rendering module "${moduleName}":`, err);
+      return `
+        <div class="card" style="padding:16px;text-align:center;color:#64748B;background:#F8FAFC;border:1px dashed #CBD5E1;border-radius:8px;margin-bottom:12px;">
+          <div style="font-size:13px;font-weight:600;margin-bottom:4px;color:#334155;">Unable to load this module</div>
+          <div style="font-size:11px;color:#94A3B8;">${escapeHtml(moduleName)}</div>
+        </div>
+      `;
+    }
+  }
+
+  function renderEmergencyFallbackDashboard(errMsg = 'Unexpected rendering error') {
+    const contentEl = document.getElementById('content');
+    if (!contentEl) return;
+    try {
+      const fallbackEvents = (DEMO_DATA && DEMO_DATA.events && DEMO_DATA.events.length > 0) ? DEMO_DATA.events : (BUILTIN_DEMO_EVENTS || []);
+      const totalEvents = fallbackEvents.length;
+      const critEvents = fallbackEvents.filter(e => (e.risk || e.risk_priority) === 'CRITICAL').length;
+      const highEvents = fallbackEvents.filter(e => (e.risk || e.risk_priority) === 'HIGH').length;
+
+      contentEl.innerHTML = `
+        <div style="padding:20px;max-width:1200px;margin:0 auto;">
+          <div style="background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+            <div>
+              <div style="font-weight:700;color:#991B1B;font-size:13px;margin-bottom:2px;">⚠️ Dashboard Recovery Mode Active</div>
+              <div style="color:#7F1D1D;font-size:11px;">The dashboard encountered a temporary rendering issue: ${escapeHtml(errMsg)}. Fallback telemetry is active.</div>
+            </div>
+            <button class="btn btn-sm btn-primary" onclick="window.__thermosafe.setDataSource('demo');window.location.reload();">Restore Demo</button>
+          </div>
+          <div class="kpi-grid">
+            <div class="kpi-card info">
+              <div class="kpi-label">Active Thermal Anomalies</div>
+              <div class="kpi-value" id="kpi-val-total">${totalEvents}</div>
+              <div class="kpi-sub">Telemetry fallback active</div>
+            </div>
+            <div class="kpi-card critical">
+              <div class="kpi-label">Critical Industrial Fires</div>
+              <div class="kpi-value" id="kpi-val-critical">${critEvents}</div>
+              <div class="kpi-sub">Immediate response required</div>
+            </div>
+            <div class="kpi-card high">
+              <div class="kpi-label">High-Risk Events</div>
+              <div class="kpi-value" id="kpi-val-high">${highEvents}</div>
+              <div class="kpi-sub">Active industrial hotspots</div>
+            </div>
+          </div>
+        </div>
+      `;
+    } catch (_) {}
+  }
+
 
   /* ========== EVENT COLOR SYSTEM (consistent everywhere) ========== */
   const EVENT_COLORS = {
@@ -2010,8 +2102,14 @@
 
     /* ========== AUTHORITATIVE DATA STATE HELPERS ========== */
   function getSourceLabelText() {
-    if (state.dataSource === 'demo' || state.dataState === 'DEMO_FALLBACK' || state.dataState === 'OFFLINE_FALLBACK') {
+    if (state.dataSource === 'demo') {
       return 'DEMO DATA';
+    }
+    if (state.dataState === 'OFFLINE_FALLBACK') {
+      return 'LIVE DATA (FALLBACK)';
+    }
+    if (state.dataState === 'DEMO_FALLBACK' || state.dataState === 'FALLBACK') {
+      return 'LIVE DATA (FALLBACK)';
     }
     if (state.dataState === 'CONNECTING') {
       return 'CONNECTING TO NASA FIRMS...';
@@ -2020,24 +2118,38 @@
   }
 
   function getSourceLabelColor() {
-    if (state.dataSource === 'demo' || state.dataState === 'DEMO_FALLBACK' || state.dataState === 'OFFLINE_FALLBACK') return '#CA8A04';
+    if (state.dataSource === 'demo' || state.dataState === 'DEMO_FALLBACK') return '#CA8A04';
+    if (state.dataState === 'OFFLINE_FALLBACK') return '#DC2626';
     if (state.dataState === 'CONNECTING') return '#D97706';
     return '#16A34A';
   }
 
   function getLiveStatusBadgeInfo() {
-    if (state.dataSource === 'demo' || state.dataState === 'DEMO_FALLBACK' || state.dataState === 'OFFLINE_FALLBACK') {
-      const isBackendDown = state.dataState === 'OFFLINE_FALLBACK' || !state.backendConnected;
+    if (state.dataState === 'OFFLINE_FALLBACK') {
       return {
-        text: isBackendDown
-          ? 'Live backend temporarily unavailable — displaying demonstration data.'
-          : 'NASA FIRMS feed pending — displaying demonstration data.',
+        text: 'Backend unavailable — showing fallback data',
+        badge: 'BACKEND OFFLINE',
+        bg: '#FEE2E2',
+        color: '#991B1B',
+        subtext: 'Backend unavailable — showing fallback data'
+      };
+    }
+    if (state.firmsState === 'UNAVAILABLE' || state.dataState === 'FALLBACK') {
+      return {
+        text: 'NASA FIRMS live feed unavailable — showing fallback data',
+        badge: 'FIRMS UNAVAILABLE',
+        bg: '#FEF3C7',
+        color: '#92400E',
+        subtext: 'NASA FIRMS live feed unavailable — showing fallback data'
+      };
+    }
+    if (state.dataSource === 'demo' || state.dataState === 'DEMO' || state.dataState === 'DEMO_FALLBACK') {
+      return {
+        text: 'Demonstration dataset active.',
         badge: 'DEMO DATA',
         bg: '#FEF3C7',
         color: '#92400E',
-        subtext: isBackendDown
-          ? 'Live backend temporarily unavailable — displaying demonstration data.'
-          : 'NASA FIRMS feed pending — displaying demonstration data.'
+        subtext: 'Simulated observations active.'
       };
     }
     if (state.dataState === 'CONNECTING') {
@@ -2070,33 +2182,70 @@
 
   function applyDemoFallbackState(reason = 'Live backend temporarily unavailable — displaying demonstration data.', isBackendOffline = false) {
     console.warn(`[ThermoSafe Fallback] Activating demo fallback mode: ${reason}`);
-    state.dataSource = 'demo';
-    state.dataState = isBackendOffline ? 'OFFLINE_FALLBACK' : 'DEMO_FALLBACK';
+    if (isBackendOffline) {
+      state.dataSource = 'live';
+      state.dataState = 'OFFLINE_FALLBACK';
+      state.backendConnected = false;
+      state.isLiveBackend = false;
+    } else if (state.dataSource === 'live') {
+      state.dataState = 'DEMO_FALLBACK';
+    } else {
+      state.dataSource = 'demo';
+      state.dataState = 'DEMO';
+    }
     state.firmsState = 'DEMO';
-    state.backendConnected = !isBackendOffline;
-    state.isLiveBackend = !isBackendOffline;
     state.lastApiError = reason;
     state.lastFirmsError = reason;
     state.liveStatusMessage = reason;
     currentEvents = (DEMO_DATA.events && DEMO_DATA.events.length > 0) ? DEMO_DATA.events : BUILTIN_DEMO_EVENTS;
-    currentFacilities = DEMO_DATA.facilities;
-    state.notifications = DEMO_DATA.notifications;
-    LIVE_DATA.events = [];
+    currentFacilities = (DEMO_DATA.facilities && DEMO_DATA.facilities.length > 0) ? DEMO_DATA.facilities : [];
+    state.notifications = (DEMO_DATA.notifications && DEMO_DATA.notifications.length > 0) ? DEMO_DATA.notifications : [];
+    if (!LIVE_DATA.events) LIVE_DATA.events = [];
 
-    if (state.currentPage === 'dashboard') {
-      updateDashboardLiveView();
+    const contentEl = document.getElementById('content');
+    if (!contentEl || !contentEl.children || contentEl.children.length === 0) {
+      if (state.currentPage === 'dashboard') {
+        renderDashboard();
+      }
     } else {
-      renderMarkers();
-      if (state.showFacilities) renderFacilities();
-      if (state.currentPage === 'incidents') renderIncidentsPage();
-      if (state.currentPage === 'alerts') renderAlertsPage();
+      if (state.currentPage === 'dashboard') {
+        updateDashboardLiveView();
+      } else {
+        renderMarkers();
+        if (state.showFacilities) renderFacilities();
+        if (state.currentPage === 'incidents') renderIncidentsPage();
+        if (state.currentPage === 'alerts') renderAlertsPage();
+      }
     }
     updateDataSourceUI();
     updateDebugDiagnostics();
   }
 
-  function activateFirmsUnavailable(reason = 'Live backend temporarily unavailable — displaying demonstration data.') {
-    applyDemoFallbackState(reason, false);
+  function activateFirmsUnavailable(reason = 'NASA FIRMS service temporarily unavailable.') {
+    console.warn(`[ThermoSafe FIRMS] Satellite feed unavailable: ${reason}`);
+    state.firmsState = 'UNAVAILABLE';
+    state.dataState = 'FALLBACK';
+    state.lastFirmsError = reason;
+    state.liveStatusMessage = 'NASA FIRMS unavailable — showing fallback data';
+    if (!currentEvents || currentEvents.length === 0) {
+      currentEvents = (DEMO_DATA.events && DEMO_DATA.events.length > 0) ? DEMO_DATA.events : BUILTIN_DEMO_EVENTS;
+    }
+    const contentEl = document.getElementById('content');
+    if (!contentEl || !contentEl.children || contentEl.children.length === 0) {
+      if (state.currentPage === 'dashboard') {
+        renderDashboard();
+      }
+    } else {
+      if (state.currentPage === 'dashboard') {
+        updateDashboardLiveView();
+      } else {
+        renderMarkers();
+        if (state.showFacilities) renderFacilities();
+        if (state.currentPage === 'incidents') renderIncidentsPage();
+      }
+    }
+    updateDataSourceUI();
+    updateDebugDiagnostics();
   }
 
   function activateDemoFallback(reason = 'Live backend temporarily unavailable — displaying demonstration data.', isBackendOffline = false) {
@@ -2157,9 +2306,13 @@
         }
         return 'http://127.0.0.1:8000';
       }
-      return 'https://thermosafe-ai.onrender.com';
+      // Running on Render or any cloud/web host (unified single-domain deployment)
+      if (host.includes('render.com') || host.includes('railway.app') || host.includes('pages.dev') || host.includes('vercel.app') || (proto === 'https:' || proto === 'http:')) {
+        return window.location.origin.replace(/\/+$/, '');
+      }
+      return 'https://thermosafe-ai-2.onrender.com';
     }
-    return 'https://thermosafe-ai.onrender.com';
+    return 'https://thermosafe-ai-2.onrender.com';
   }
 
   const API_BASE_URL = resolveApiBaseUrl();
@@ -2228,13 +2381,13 @@
       return await resp.text();
     },
 
-    async checkHealth(timeoutMs = 6000) {
+    async checkHealth(timeoutMs = 3500) {
       try {
         const data = await this.request('/health', { timeout: timeoutMs }, 0);
         return !!data && (data.status === 'ok' || data.status === 'healthy');
       } catch (e) {
         try {
-          const apiData = await this.request('/api/health', { timeout: Math.min(timeoutMs, 4000) }, 0);
+          const apiData = await this.request('/api/health', { timeout: Math.min(timeoutMs, 2500) }, 0);
           return !!apiData && (apiData.status === 'ok' || apiData.status === 'healthy');
         } catch (_) {
           return false;
@@ -2373,11 +2526,23 @@
       return await this.request('/api/firms/health');
     },
 
+    async getFirmsData(days = 1) {
+      try {
+        return await this.request(`/api/firms?days=${days}`);
+      } catch (err) {
+        return await this.request(`/api/firms/live?days=${days}`);
+      }
+    },
+
     async getSatelliteThermalEvents(mode = 'live', country = 'IND', days = 1) {
       try {
-        return await this.request(`/api/firms/live?days=${days}`);
+        return await this.request(`/api/firms?days=${days}`);
       } catch (err) {
-        return await this.request(`/api/satellite/thermal-events?mode=${mode}&country=${country}&days=${days}`);
+        try {
+          return await this.request(`/api/firms/live?days=${days}`);
+        } catch (_) {
+          return await this.request(`/api/satellite/thermal-events?mode=${mode}&country=${country}&days=${days}`);
+        }
       }
     },
 
@@ -2441,7 +2606,17 @@
 
   /* ========== BACKEND TO FRONTEND DATA MAPPERS ========== */
   function mapBackendEvent(e) {
-    const pUpper = (e.risk_priority || 'LOW').toUpperCase();
+    if (!e || typeof e !== 'object') return null;
+    const lat = Number(e.latitude !== undefined ? e.latitude : e.lat);
+    const lng = Number(e.longitude !== undefined ? e.longitude : (e.lng !== undefined ? e.lng : e.lon));
+    if (isNaN(lat) || isNaN(lng)) return null;
+
+    // Step 7: Geographical boundary validation strictly for India (lat 6.0 to 38.0, lon 68.0 to 98.0)
+    if (lat < 6.0 || lat > 38.0 || lng < 68.0 || lng > 98.0) {
+      return null;
+    }
+
+    const pUpper = (e.risk_priority || e.riskPriority || 'LOW').toUpperCase();
     const eventType = e.event_type || 'Industrial Fire';
     const classification = (e.ai_classification && e.ai_classification.classification) ||
                            (e.classifications && e.classifications[0]?.classification) ||
@@ -2492,16 +2667,30 @@
     );
     const confPct = Math.round(numConf <= 1 ? numConf * 100 : numConf);
 
+    const acqDate = e.acquisitionDate || e.acq_date || (e.detected_at ? String(e.detected_at).split('T')[0] : new Date().toISOString().split('T')[0]);
+    const acqTime = e.acquisitionTime || (e.acq_time ? String(e.acq_time).padStart(4, '0') : (e.detected_at ? String(e.detected_at).split('T')[1]?.slice(0,5) : '00:00'));
+    const satName = e.satellite || e.satellite_name || 'VIIRS NOAA-21';
+    const instrumentName = e.instrument || 'VIIRS';
+    const sourceStr = e.source || e.data_source || 'NASA FIRMS';
+    const brightnessVal = e.brightness || e.bright_ti4 || e.bright_ti5 || (e.thermal_intensity ? String(e.thermal_intensity) : '365 K');
+    const locationStr = e.location || (city && stateName ? `${city}, ${stateName}` : 'Industrial Belt, India');
+
     return {
       id: e.event_id || (e.id ? `TH-${e.id}` : 'TH-001'),
       event_id: e.event_id || (e.id ? `TH-${e.id}` : 'TH-001'),
       dbId: e.id,
-      lat: Number(e.latitude),
-      latitude: Number(e.latitude),
-      lng: Number(e.longitude),
-      longitude: Number(e.longitude),
+      lat: lat,
+      latitude: lat,
+      lng: lng,
+      longitude: lng,
       city: city,
       state: stateName,
+      location: locationStr,
+      brightness: brightnessVal,
+      acquisitionDate: acqDate,
+      acquisitionTime: acqTime,
+      satellite: satName,
+      instrument: instrumentName,
       classification: classification,
       eventType: eventType,
       event_type: eventType,
@@ -2896,6 +3085,18 @@
     const mapEl = document.getElementById('map');
     if (!mapEl) return;
 
+    if (typeof L === 'undefined') {
+      console.warn('[ThermoSafe] Leaflet library is not loaded or CDN is offline');
+      mapEl.innerHTML = `
+        <div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#F8FAFC;color:#64748B;padding:20px;text-align:center;">
+          <div style="font-size:32px;margin-bottom:8px;">🗺️</div>
+          <div style="font-weight:700;font-size:14px;color:#1E293B;margin-bottom:4px;">Map Engine Initializing</div>
+          <div style="font-size:12px;max-width:320px;">Leaflet map engine connecting. Thermal anomaly data remains tracked in KPI cards and incident lists.</div>
+        </div>
+      `;
+      return;
+    }
+
     if (state.map) {
       try {
         state.map.off();
@@ -3034,17 +3235,17 @@
               ${riskBadge(riskVal)}
             </div>
           </div>
-          <div style="background:#F8FAFC; border:1px solid #E2E8F0; padding:12px; border-radius:8px; min-width:210px; font-size:12px; line-height:1.6;">
+          <div style="background:#F8FAFC; border:1px solid #E2E8F0; padding:12px; border-radius:8px; min-width:220px; font-size:12px; line-height:1.6;">
   <div><b>Event ID:</b> <span style="font-family:monospace;">${escapeHtml(String(ev.id || 'N/A'))}</span></div>
-  <div><b>Data Source:</b> ${isDemo ? '<span style="color:#7C3AED;font-weight:600;">DEMO</span>' : '<span style="color:#059669;font-weight:600;">NASA FIRMS LIVE</span>'}</div>
-  <div><b>Location:</b> ${escapeHtml(String(ev.city || ev.location || (ev.lat != null ? ev.lat.toFixed(3) + ', ' + ev.lng.toFixed(3) : 'Perimeter')))}</div>
-  <div><b>Latitude:</b> <span style="font-family:monospace;">${ev.lat != null ? ev.lat.toFixed(4) : 'N/A'}</span></div>
-  <div><b>Longitude:</b> <span style="font-family:monospace;">${ev.lng != null ? ev.lng.toFixed(4) : 'N/A'}</span></div>
-  <div><b>Event Type:</b> ${escapeHtml(String(ev.event_type || ev.type || 'Thermal Anomaly'))}</div>
-  <div><b>AI Classification:</b> <span style="font-weight:600; color:#0284C7;">${escapeHtml(String(ev.classification || ev.ai_classification || (isDemo ? 'Unclassified' : 'Active Hotspot')))}</span></div>
-  <div><b>AI Confidence:</b> <b>${ev.confidence != null ? ev.confidence : 85}%</b></div>
+  <div><b>Source:</b> ${isDemo ? '<span style="color:#7C3AED;font-weight:700;">DEMO</span>' : '<span style="color:#059669;font-weight:700;">NASA FIRMS</span>'}</div>
+  <div><b>Location:</b> ${escapeHtml(String(ev.location || ev.city || 'India'))}</div>
+  <div><b>Coordinates:</b> <span style="font-family:monospace;">${ev.lat != null ? ev.lat.toFixed(4) : 'N/A'}°N, ${ev.lng != null ? ev.lng.toFixed(4) : 'N/A'}°E</span></div>
+  <div><b>Acquired:</b> <span style="font-family:monospace;">${escapeHtml(String(ev.acquisitionDate || ''))} ${escapeHtml(String(ev.acquisitionTime || ''))}</span></div>
+  <div><b>Satellite:</b> ${escapeHtml(String(ev.satellite || 'VIIRS'))}</div>
+  <div><b>Classification:</b> <span style="font-weight:600; color:#0284C7;">${escapeHtml(String(ev.classification || (isDemo ? 'Unclassified' : 'Thermal Hotspot')))}</span></div>
+  <div><b>Confidence:</b> <b>${ev.confidence != null ? ev.confidence : 85}%</b></div>
+  <div><b>Brightness / FRP:</b> ${escapeHtml(String(ev.brightness || ev.intensity || '365 K'))}</div>
   <div><b>Risk Priority:</b> ${typeof riskBadge === 'function' ? riskBadge(ev.risk || ev.risk_priority || 'HIGH') : (ev.risk || 'HIGH')}</div>
-  <div><b>Thermal Intensity:</b> ${escapeHtml(String(ev.frp != null ? ev.frp : (ev.brightness != null ? ev.brightness : (ev.intensity || 'N/A'))))} MW</div>
 </div>
 <button onclick="window.__thermosafe ? window.__thermosafe.viewFullAnalysis('${ev.id}') : viewFullAnalysis('${ev.id}')"
   style="margin-top:8px; width:100%; background:#1E5AA8; color:white; border:none; padding:7px 12px; border-radius:6px; font-size:11px; font-weight:700; cursor:pointer; font-family:inherit; box-shadow:0 1px 3px rgba(0,0,0,0.15);">
@@ -3504,148 +3705,174 @@
     const content = document.getElementById('content');
     if (!content) return;
 
-    state.dashboardMountCount++;
-    console.log(`[ThermoSafe Debug] Full Dashboard Mounted (count: ${state.dashboardMountCount}, source: ${state.dataSource})`);
+    try {
+      state.dashboardMountCount++;
+      console.log(`[ThermoSafe Debug] Full Dashboard Mounted (count: ${state.dashboardMountCount}, source: ${state.dataSource})`);
 
-    const s = (state.dataSource === 'live' && state.backendAnalytics) ? state.backendAnalytics.summary : null;
-    const totalEvents = s ? s.total_thermal_events : currentEvents.length;
-    const critEvents = s ? s.critical_events : currentEvents.filter(e => (e.risk || e.risk_priority) === 'CRITICAL').length;
-    const highEvents = s ? s.high_risk_events : currentEvents.filter(e => (e.risk || e.risk_priority) === 'HIGH').length;
-    const modEvents = s ? s.moderate_events : currentEvents.filter(e => (e.risk || e.risk_priority) === 'MEDIUM' || (e.classification || '').includes('Gas')).length;
-    const lowEvents = s ? s.low_risk_events : currentEvents.filter(e => (e.risk || e.risk_priority) === 'LOW').length;
-    const facCount = s ? s.industrial_facilities : currentFacilities.length;
+      const s = (state.dataSource === 'live' && state.backendAnalytics) ? state.backendAnalytics.summary : null;
+      const safeEvents = Array.isArray(currentEvents) ? currentEvents : (DEMO_DATA.events || BUILTIN_DEMO_EVENTS || []);
+      const safeFacilities = Array.isArray(currentFacilities) ? currentFacilities : (DEMO_DATA.facilities || []);
 
-    content.innerHTML = `
-      <div class="dashboard-header-banner" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding:10px 16px;background:#FFFFFF;border:1px solid #D6E2EF;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.05);flex-wrap:wrap;gap:8px;">
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <span style="font-weight:800;font-size:13px;color:#0B2545;letter-spacing:0.5px;">
-            DATA SOURCE: <span id="dashSourceLabel" style="color:${getSourceLabelColor()};">${getSourceLabelText()}</span>
-          </span>
-          <span id="dashLiveStatus" style="font-size:11px;padding:2px 8px;border-radius:12px;background:${getLiveStatusBadgeInfo().bg};color:${getLiveStatusBadgeInfo().color};font-weight:700;">
-            ${getLiveStatusBadgeInfo().badge || getLiveStatusBadgeInfo().text}
-          </span>
-          <span id="dashLiveSubtext" style="font-size:11px;color:#92400E;font-style:italic;${getLiveStatusBadgeInfo().subtext ? '' : 'display:none;'}">
-            ${getLiveStatusBadgeInfo().subtext || ''}
-          </span>
-          <span id="dashHotspotsCount" style="font-size:11px;padding:2px 8px;border-radius:12px;background:#EFF6FF;color:#1D4ED8;font-weight:700;">
-            Hotspots: ${currentEvents.length}
-          </span>
-        </div>
-        <div style="display:flex;align-items:center;gap:12px;font-size:12px;color:#7A8699;">
-          <div>
-            LAST UPDATED: <span id="dashLastUpdated" style="font-weight:700;color:#0B2545;font-family:monospace;">${state.lastSuccessfulFirmsFetch ? state.lastSuccessfulFirmsFetch.toLocaleTimeString() : (state.lastSuccessfulFetch ? state.lastSuccessfulFetch.toLocaleTimeString() : (state.dataSource === 'demo' ? 'DEMO DATASET' : 'CONNECTING...'))}</span>
+      const totalEvents = s ? s.total_thermal_events : safeEvents.length;
+      const critEvents = s ? s.critical_events : safeEvents.filter(e => (e.risk || e.risk_priority) === 'CRITICAL').length;
+      const highEvents = s ? s.high_risk_events : safeEvents.filter(e => (e.risk || e.risk_priority) === 'HIGH').length;
+      const modEvents = s ? s.moderate_events : safeEvents.filter(e => (e.risk || e.risk_priority) === 'MEDIUM' || (e.classification || '').includes('Gas') || (e.classification || '') === 'GAS_FLARE').length;
+      const lowEvents = s ? s.low_risk_events : safeEvents.filter(e => (e.risk || e.risk_priority) === 'LOW').length;
+      const facCount = s ? s.industrial_facilities : safeFacilities.length;
+
+      const headerBannerHtml = renderSafeModule('Header Banner', () => `
+        <div class="dashboard-header-banner" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding:10px 16px;background:#FFFFFF;border:1px solid #D6E2EF;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.05);flex-wrap:wrap;gap:8px;">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span style="font-weight:800;font-size:13px;color:#0B2545;letter-spacing:0.5px;">
+              DATA SOURCE: <span id="dashSourceLabel" style="color:${getSourceLabelColor()};">${getSourceLabelText()}</span>
+            </span>
+            <span id="dashLiveStatus" style="font-size:11px;padding:2px 8px;border-radius:12px;background:${getLiveStatusBadgeInfo().bg};color:${getLiveStatusBadgeInfo().color};font-weight:700;">
+              ${getLiveStatusBadgeInfo().badge || getLiveStatusBadgeInfo().text}
+            </span>
+            <span id="dashLiveSubtext" style="font-size:11px;color:#92400E;font-style:italic;${getLiveStatusBadgeInfo().subtext ? '' : 'display:none;'}">
+              ${getLiveStatusBadgeInfo().subtext || ''}
+            </span>
+            <span id="dashHotspotsCount" style="font-size:11px;padding:2px 8px;border-radius:12px;background:#EFF6FF;color:#1D4ED8;font-weight:700;">
+              Hotspots: ${safeEvents.length}
+            </span>
           </div>
-          <button id="btnManualRefresh" class="btn btn-sm btn-outline" style="padding:3px 10px;font-size:11px;font-weight:700;height:26px;display:inline-flex;align-items:center;gap:4px;" onclick="window.__thermosafe.manualRefreshFirms()">
-            ↻ Refresh
-          </button>
-        </div>
-      </div>
-
-      <div class="kpi-grid">
-        <div class="kpi-card info">
-          <div class="kpi-label">Active Thermal Anomalies</div>
-          <div class="kpi-value" id="kpi-val-total">${totalEvents}</div>
-          <div class="kpi-sub" id="kpi-sub-total">${state.dataSource === 'live' ? 'Live telemetry synchronized' : 'Simulated observations'}</div>
-        </div>
-        <div class="kpi-card critical">
-          <div class="kpi-label">Critical Industrial Fires</div>
-          <div class="kpi-value" id="kpi-val-critical">${critEvents}</div>
-          <div class="kpi-sub" id="kpi-sub-critical">Immediate response required</div>
-        </div>
-        <div class="kpi-card high">
-          <div class="kpi-label">High-Risk Events</div>
-          <div class="kpi-value" id="kpi-val-high">${highEvents}</div>
-          <div class="kpi-sub" id="kpi-sub-high">Active industrial hotspots</div>
-        </div>
-        <div class="kpi-card medium">
-          <div class="kpi-label">Gas Flares & Moderate</div>
-          <div class="kpi-value" id="kpi-val-moderate">${modEvents}</div>
-          <div class="kpi-sub" id="kpi-sub-moderate">Continuous monitoring</div>
-        </div>
-        <div class="kpi-card persistent">
-          <div class="kpi-label">Monitored Facilities</div>
-          <div class="kpi-value" id="kpi-val-facilities">${facCount}</div>
-          <div class="kpi-sub" id="kpi-sub-facilities">Industrial perimeter registry</div>
-        </div>
-        <div class="kpi-card low">
-          <div class="kpi-label">Normal / Low Activity</div>
-          <div class="kpi-value" id="kpi-val-low">${lowEvents}</div>
-          <div class="kpi-sub" id="kpi-sub-low">Baseline thermal levels</div>
-        </div>
-      </div>
-
-      <div class="dashboard-grid" style="height:calc(100vh - 260px);min-height:520px;">
-        <div class="map-container">
-          <div id="map"></div>
-          <div class="legend">
-            <div class="legend-title">Thermal Event Legend</div>
-            <div class="legend-item"><div class="legend-dot" style="background:#DC2626;"></div>Critical Industrial Fire</div>
-            <div class="legend-item"><div class="legend-dot" style="background:#EA580C;"></div>High-Risk Thermal Event</div>
-            <div class="legend-item"><div class="legend-dot" style="background:#CA8A04;"></div>Gas Flare / Moderate</div>
-            <div class="legend-item"><div class="legend-dot" style="background:#7C3AED;"></div>Persistent Thermal Source</div>
-            <div class="legend-item"><div class="legend-square" style="background:#2563EB;"></div>Industrial Facility</div>
-            <div class="legend-item"><div class="legend-dot" style="background:#16A34A;"></div>Low-Risk / Normal</div>
-          </div>
-        </div>
-
-        <div class="right-panel">
-          <div class="card">
-            <div class="card-title">
-              <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/><path d="M12 6v6l4 2"/></svg>
-              AI Thermal Classification
+          <div style="display:flex;align-items:center;gap:12px;font-size:12px;color:#7A8699;">
+            <div>
+              LAST UPDATED: <span id="dashLastUpdated" style="font-weight:700;color:#0B2545;font-family:monospace;">${state.lastSuccessfulFirmsFetch ? state.lastSuccessfulFirmsFetch.toLocaleTimeString() : (state.lastSuccessfulFetch ? state.lastSuccessfulFetch.toLocaleTimeString() : (state.dataSource === 'demo' ? 'DEMO DATASET' : 'CONNECTING...'))}</span>
             </div>
-            <div id="ai-panel-content">
-              <div style="text-align:center;padding:24px 0;color:#7A8699;font-size:13px;line-height:1.6;">
-                <div style="font-size:36px;margin-bottom:10px;opacity:0.5;">🛰️</div>
-                Select a thermal marker on the map<br>to view AI classification.
-              </div>
+            <button id="btnManualRefresh" class="btn btn-sm btn-outline" style="padding:3px 10px;font-size:11px;font-weight:700;height:26px;display:inline-flex;align-items:center;gap:4px;" onclick="window.__thermosafe.manualRefreshFirms()">
+              ↻ Refresh
+            </button>
+          </div>
+        </div>
+      `);
+
+      const kpiGridHtml = renderSafeModule('KPI Grid', () => `
+        <div class="kpi-grid">
+          <div class="kpi-card info">
+            <div class="kpi-label">Active Thermal Anomalies</div>
+            <div class="kpi-value" id="kpi-val-total">${totalEvents}</div>
+            <div class="kpi-sub" id="kpi-sub-total">${state.dataSource === 'live' ? 'Live telemetry synchronized' : 'Simulated observations'}</div>
+          </div>
+          <div class="kpi-card critical">
+            <div class="kpi-label">Critical Industrial Fires</div>
+            <div class="kpi-value" id="kpi-val-critical">${critEvents}</div>
+            <div class="kpi-sub" id="kpi-sub-critical">Immediate response required</div>
+          </div>
+          <div class="kpi-card high">
+            <div class="kpi-label">High-Risk Events</div>
+            <div class="kpi-value" id="kpi-val-high">${highEvents}</div>
+            <div class="kpi-sub" id="kpi-sub-high">Active industrial hotspots</div>
+          </div>
+          <div class="kpi-card medium">
+            <div class="kpi-label">Gas Flares & Moderate</div>
+            <div class="kpi-value" id="kpi-val-moderate">${modEvents}</div>
+            <div class="kpi-sub" id="kpi-sub-moderate">Continuous monitoring</div>
+          </div>
+          <div class="kpi-card persistent">
+            <div class="kpi-label">Monitored Facilities</div>
+            <div class="kpi-value" id="kpi-val-facilities">${facCount}</div>
+            <div class="kpi-sub" id="kpi-sub-facilities">Industrial perimeter registry</div>
+          </div>
+          <div class="kpi-card low">
+            <div class="kpi-label">Normal / Low Activity</div>
+            <div class="kpi-value" id="kpi-val-low">${lowEvents}</div>
+            <div class="kpi-sub" id="kpi-sub-low">Baseline thermal levels</div>
+          </div>
+        </div>
+      `);
+
+      const aiCardHtml = renderSafeModule('AI Thermal Classification', () => `
+        <div class="card">
+          <div class="card-title">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/><path d="M12 6v6l4 2"/></svg>
+            AI Thermal Classification
+          </div>
+          <div id="ai-panel-content">
+            <div style="text-align:center;padding:24px 0;color:#7A8699;font-size:13px;line-height:1.6;">
+              <div style="font-size:36px;margin-bottom:10px;opacity:0.5;">🛰️</div>
+              Select a thermal marker on the map<br>to view AI classification.
             </div>
           </div>
+        </div>
+      `);
 
+      const liveFeedHtml = renderSafeModule('Live Event Feed', () => {
+        const feedItems = Array.isArray(LIVE_FEED) ? LIVE_FEED.slice(0, 6) : [];
+        return `
           <div class="card">
             <div class="card-title">
               <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
               Live Event Feed
             </div>
             <div id="live-feed">
-              ${LIVE_FEED.slice(0, 6).map(f => `
+              ${feedItems.map(f => `
                 <div class="feed-item">
-                  <span class="feed-time">${f.time}</span>
-                  <span class="feed-text">${escapeHtml(f.text)}</span>
+                  <span class="feed-time">${f.time || ''}</span>
+                  <span class="feed-text">${escapeHtml(f.text || '')}</span>
                 </div>
               `).join('')}
             </div>
           </div>
+        `;
+      });
 
-          <div class="card">
-            <div class="card-title">
-              <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-              SIMULATION & CONTROLS
+      const simulationControlsHtml = renderSafeModule('Simulation Controls', () => `
+        <div class="card">
+          <div class="card-title">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            SIMULATION & CONTROLS
+          </div>
+          <div style="font-size:11px;color:#7A8699;margin-bottom:12px;line-height:1.5;">
+            Trigger simulated incident alerts for demonstration
+          </div>
+          <div class="btn-grid">
+            <button class="btn btn-danger btn-sm" onclick="window.__thermosafe.simulate('Industrial Fire')">🔴 Critical Fire</button>
+            <button class="btn btn-warning btn-sm" onclick="window.__thermosafe.simulate('High-Risk Thermal')">🟠 High-Risk</button>
+          </div>
+          <div class="btn-grid" style="margin-top:8px;">
+            <button class="btn btn-warning btn-sm" style="background:#CA8A04;" onclick="window.__thermosafe.simulate('Gas Flare')">🟡 Gas Flare</button>
+            <button class="btn btn-purple btn-sm" onclick="window.__thermosafe.simulate('Persistent Thermal Source')">🟣 Persistent</button>
+          </div>
+          <button class="btn btn-outline btn-block btn-sm" style="margin-top:8px;" onclick="window.__thermosafe.requestNotifPermission()">
+            🔔 Enable Browser Notifications
+          </button>
+          <button class="btn btn-primary btn-block btn-sm" style="margin-top:8px;" onclick="window.__thermosafe.simulateCritical()">
+            ⚡ SIMULATE CRITICAL ALERT
+          </button>
+        </div>
+      `);
+
+      content.innerHTML = `
+        ${headerBannerHtml}
+        ${kpiGridHtml}
+        <div class="dashboard-grid" style="height:calc(100vh - 260px);min-height:520px;">
+          <div class="map-container">
+            <div id="map"></div>
+            <div class="legend">
+              <div class="legend-title">Thermal Event Legend</div>
+              <div class="legend-item"><div class="legend-dot" style="background:#DC2626;"></div>Critical Industrial Fire</div>
+              <div class="legend-item"><div class="legend-dot" style="background:#EA580C;"></div>High-Risk Thermal Event</div>
+              <div class="legend-item"><div class="legend-dot" style="background:#CA8A04;"></div>Gas Flare / Moderate</div>
+              <div class="legend-item"><div class="legend-dot" style="background:#7C3AED;"></div>Persistent Thermal Source</div>
+              <div class="legend-item"><div class="legend-square" style="background:#2563EB;"></div>Industrial Facility</div>
+              <div class="legend-item"><div class="legend-dot" style="background:#16A34A;"></div>Low-Risk / Normal</div>
             </div>
-            <div style="font-size:11px;color:#7A8699;margin-bottom:12px;line-height:1.5;">
-              Trigger simulated incident alerts for demonstration
-            </div>
-            <div class="btn-grid">
-              <button class="btn btn-danger btn-sm" onclick="window.__thermosafe.simulate('Industrial Fire')">🔴 Critical Fire</button>
-              <button class="btn btn-warning btn-sm" onclick="window.__thermosafe.simulate('High-Risk Thermal')">🟠 High-Risk</button>
-            </div>
-            <div class="btn-grid" style="margin-top:8px;">
-              <button class="btn btn-warning btn-sm" style="background:#CA8A04;" onclick="window.__thermosafe.simulate('Gas Flare')">🟡 Gas Flare</button>
-              <button class="btn btn-purple btn-sm" onclick="window.__thermosafe.simulate('Persistent Thermal Source')">🟣 Persistent</button>
-            </div>
-            <button class="btn btn-outline btn-block btn-sm" style="margin-top:8px;" onclick="window.__thermosafe.requestNotifPermission()">
-              🔔 Enable Browser Notifications
-            </button>
-            <button class="btn btn-primary btn-block btn-sm" style="margin-top:8px;" onclick="window.__thermosafe.simulateCritical()">
-              ⚡ SIMULATE CRITICAL ALERT
-            </button>
+          </div>
+          <div class="right-panel">
+            ${aiCardHtml}
+            ${liveFeedHtml}
+            ${simulationControlsHtml}
           </div>
         </div>
-      </div>
-    `;
+      `;
 
-    setTimeout(initMap, 50);
-    updateDebugDiagnostics();
+      setTimeout(initMap, 50);
+      updateDebugDiagnostics();
+    } catch (dashErr) {
+      console.error('[ThermoSafe] Top-level renderDashboard error caught:', dashErr);
+      renderEmergencyFallbackDashboard(dashErr.message);
+    }
   }
 
   function updateDashboardLiveView() {
@@ -3692,43 +3919,36 @@
       }
     }
 
-    if (state.dataState === 'CONNECTING') {
-      const elValTotal = document.getElementById('kpi-val-total');
-      if (elValTotal) elValTotal.innerHTML = '<span style="font-size:20px;color:#D97706;animation:pulse 1.5s infinite;">CONNECTING...</span>';
-      const elSubTotal = document.getElementById('kpi-sub-total');
-      if (elSubTotal) elSubTotal.textContent = 'Connecting to NASA FIRMS...';
+    const elValTotal = document.getElementById('kpi-val-total');
+    if (elValTotal) elValTotal.textContent = totalEvents;
 
-      const elValCrit = document.getElementById('kpi-val-critical');
-      if (elValCrit) elValCrit.textContent = '--';
-      const elValHigh = document.getElementById('kpi-val-high');
-      if (elValHigh) elValHigh.textContent = '--';
-      const elValMod = document.getElementById('kpi-val-moderate');
-      if (elValMod) elValMod.textContent = '--';
-      const elValFac = document.getElementById('kpi-val-facilities');
-      if (elValFac) elValFac.textContent = facCount;
-      const elValLow = document.getElementById('kpi-val-low');
-      if (elValLow) elValLow.textContent = '--';
-    } else {
-      const elValTotal = document.getElementById('kpi-val-total');
-      if (elValTotal) elValTotal.textContent = totalEvents;
-      const elSubTotal = document.getElementById('kpi-sub-total');
-      if (elSubTotal) elSubTotal.textContent = state.dataSource === 'live' ? 'Live telemetry synchronized' : 'Simulated observations';
-
-      const elValCrit = document.getElementById('kpi-val-critical');
-      if (elValCrit) elValCrit.textContent = critEvents;
-
-      const elValHigh = document.getElementById('kpi-val-high');
-      if (elValHigh) elValHigh.textContent = highEvents;
-
-      const elValMod = document.getElementById('kpi-val-moderate');
-      if (elValMod) elValMod.textContent = modEvents;
-
-      const elValFac = document.getElementById('kpi-val-facilities');
-      if (elValFac) elValFac.textContent = facCount;
-
-      const elValLow = document.getElementById('kpi-val-low');
-      if (elValLow) elValLow.textContent = lowEvents;
+    const elSubTotal = document.getElementById('kpi-sub-total');
+    if (elSubTotal) {
+      if (state.dataState === 'CONNECTING') {
+        elSubTotal.textContent = 'Connecting to NASA FIRMS...';
+      } else if (state.dataState === 'OFFLINE_FALLBACK') {
+        elSubTotal.textContent = 'Backend offline — fallback active';
+      } else if (state.dataState === 'FALLBACK' || state.firmsState === 'UNAVAILABLE') {
+        elSubTotal.textContent = 'FIRMS offline — fallback active';
+      } else {
+        elSubTotal.textContent = state.dataSource === 'live' ? 'Live telemetry synchronized' : 'Simulated observations';
+      }
     }
+
+    const elValCrit = document.getElementById('kpi-val-critical');
+    if (elValCrit) elValCrit.textContent = critEvents;
+
+    const elValHigh = document.getElementById('kpi-val-high');
+    if (elValHigh) elValHigh.textContent = highEvents;
+
+    const elValMod = document.getElementById('kpi-val-moderate');
+    if (elValMod) elValMod.textContent = modEvents;
+
+    const elValFac = document.getElementById('kpi-val-facilities');
+    if (elValFac) elValFac.textContent = facCount;
+
+    const elValLow = document.getElementById('kpi-val-low');
+    if (elValLow) elValLow.textContent = lowEvents;
 
     const liveFeedEl = document.getElementById('live-feed');
     if (liveFeedEl && LIVE_FEED && LIVE_FEED.length > 0) {
@@ -5518,16 +5738,23 @@ Explanation: ${ev.explanation}
     // Topbar Pill
     const pill = document.getElementById('backendPill');
     if (pill) {
-      if (state.dataSource === 'live' && state.backendConnected && state.dataState === 'LIVE') {
-        pill.innerHTML = '● NASA FIRMS LIVE (INDIA)';
-        pill.style.background = 'rgba(22,163,74,0.2)';
-        pill.style.color = '#86EFAC';
-        pill.style.borderColor = 'rgba(34,197,94,0.4)';
-      } else if (state.dataState === 'CONNECTING') {
-        pill.innerHTML = '● CONNECTING...';
-        pill.style.background = 'rgba(59,130,246,0.2)';
-        pill.style.color = '#93C5FD';
-        pill.style.borderColor = 'rgba(59,130,246,0.4)';
+      if (state.dataSource === 'live') {
+        if (state.backendConnected && state.dataState === 'LIVE') {
+          pill.innerHTML = '● LIVE DATA (Source: NASA FIRMS)';
+          pill.style.background = 'rgba(22,163,74,0.2)';
+          pill.style.color = '#86EFAC';
+          pill.style.borderColor = 'rgba(34,197,94,0.4)';
+        } else if (state.dataState === 'CONNECTING') {
+          pill.innerHTML = '● CONNECTING...';
+          pill.style.background = 'rgba(59,130,246,0.2)';
+          pill.style.color = '#93C5FD';
+          pill.style.borderColor = 'rgba(59,130,246,0.4)';
+        } else {
+          pill.innerHTML = '● LIVE DATA (BACKEND OFFLINE)';
+          pill.style.background = 'rgba(234,88,12,0.2)';
+          pill.style.color = '#FDBA74';
+          pill.style.borderColor = 'rgba(234,88,12,0.4)';
+        }
       } else {
         pill.innerHTML = '● DATA SOURCE: DEMO DATA';
         pill.style.background = 'rgba(202,138,4,0.2)';
@@ -5588,9 +5815,9 @@ Explanation: ${ev.explanation}
       updateDataSourceUI();
 
       if (!isHealthy) {
-        const backendOfflineMsg = 'Live backend temporarily unavailable — displaying demonstration data.';
+        const backendOfflineMsg = 'Backend unavailable — showing fallback data';
         state.lastApiError = backendOfflineMsg;
-        activateDemoFallback(backendOfflineMsg);
+        applyDemoFallbackState(backendOfflineMsg, true);
         updateDebugDiagnostics();
         return;
       }
@@ -5618,7 +5845,7 @@ Explanation: ${ev.explanation}
             state.lastFirmsError = null;
             state.lastApiError = null;
             state.lastSuccessfulFetch = new Date();
-            LIVE_DATA.events = rawEvents.map(mapBackendEvent);
+            LIVE_DATA.events = rawEvents.map(mapBackendEvent).filter(Boolean);
             currentEvents = LIVE_DATA.events;
 
             if (rawEvents.length === 0) {
@@ -5789,29 +6016,31 @@ Explanation: ${ev.explanation}
       state.backendConnected = false;
       state.isLiveBackend = false;
       state.lastApiError = err.message || 'Fetch error';
-      if (state.dataState !== 'LIVE' || LIVE_DATA.events.length === 0) {
-        activateDemoFallback(err.message || 'Live backend connection error');
-      } else {
-        state.firmsState = 'LIVE_STALE';
-        if (state.currentPage === 'dashboard') updateDashboardLiveView();
-      }
+      applyDemoFallbackState(err.message || 'Backend unavailable — showing fallback data', true);
       updateDataSourceUI();
       updateDebugDiagnostics();
     }
   }
 
   async function setDataSource(source, skipToast = false) {
+    const reqId = ++state.liveFetchRequestId;
+
     if (source === 'demo') {
       state.dataSource = 'demo';
       state.dataState = 'DEMO';
       state.firmsState = 'DEMO';
-      currentEvents = DEMO_DATA.events;
+      currentEvents = (DEMO_DATA.events && DEMO_DATA.events.length > 0) ? DEMO_DATA.events : BUILTIN_DEMO_EVENTS;
       currentFacilities = DEMO_DATA.facilities;
       state.notifications = DEMO_DATA.notifications;
       stopLivePolling();
       updateDataSourceUI();
       if (state.currentPage === 'dashboard') {
-        updateDashboardLiveView();
+        const mapEl = document.getElementById('map');
+        if (mapEl && state.map) {
+          updateDashboardLiveView();
+        } else {
+          renderDashboard();
+        }
       } else {
         renderMarkers();
         if (state.showFacilities) renderFacilities();
@@ -5826,9 +6055,9 @@ Explanation: ${ev.explanation}
     // Switch to LIVE mode: Production default
     state.dataSource = 'live';
     state.dataState = LIVE_DATA.events.length > 0 ? 'LIVE' : 'CONNECTING';
-    currentEvents = LIVE_DATA.events;
+    currentEvents = LIVE_DATA.events.length > 0 ? LIVE_DATA.events : ((DEMO_DATA.events && DEMO_DATA.events.length > 0) ? DEMO_DATA.events : BUILTIN_DEMO_EVENTS);
     currentFacilities = LIVE_DATA.facilities.length > 0 ? LIVE_DATA.facilities : currentFacilities;
-    state.notifications = LIVE_DATA.notifications;
+    state.notifications = LIVE_DATA.notifications && LIVE_DATA.notifications.length > 0 ? LIVE_DATA.notifications : state.notifications;
     if (LIVE_DATA.analytics) state.backendAnalytics = LIVE_DATA.analytics;
     if (LIVE_DATA.reports) state.backendReports = LIVE_DATA.reports;
     if (LIVE_DATA.operatorTeams) state.operatorTeams = LIVE_DATA.operatorTeams;
@@ -5848,13 +6077,19 @@ Explanation: ${ev.explanation}
       } else {
         renderDashboard();
       }
+    } else if (state.currentPage === 'map') {
+      renderMapPage();
+    } else if (state.currentPage === 'incidents') {
+      renderIncidentsPage();
+    } else if (state.currentPage === 'alerts') {
+      renderAlertsPage();
+    } else if (state.currentPage === 'analytics') {
+      renderAnalyticsPage();
+    } else if (state.currentPage === 'reports') {
+      renderReportsPage();
+    } else if (state.currentPage === 'settings') {
+      renderSettingsPage();
     }
-    else if (state.currentPage === 'map') renderMapPage();
-    else if (state.currentPage === 'incidents') renderIncidentsPage();
-    else if (state.currentPage === 'alerts') renderAlertsPage();
-    else if (state.currentPage === 'analytics') renderAnalyticsPage();
-    else if (state.currentPage === 'reports') renderReportsPage();
-    else if (state.currentPage === 'settings') renderSettingsPage();
 
     updateDebugDiagnostics();
   }
@@ -5955,6 +6190,7 @@ Explanation: ${ev.explanation}
   });
 
   /* ========== GLOBAL EXPORT ========== */
+  window.getFirmsData = (days = 1) => apiClient.getFirmsData(days);
   window.__thermosafe = {
     selectEvent,
     viewFullAnalysis,
@@ -6071,20 +6307,34 @@ Explanation: ${ev.explanation}
     state.dataSource = 'live';
     state.dataState = 'CONNECTING';
     state.firmsState = 'INITIALIZING';
-    currentEvents = LIVE_DATA.events;
-    currentFacilities = LIVE_DATA.facilities.length > 0 ? LIVE_DATA.facilities : DEMO_DATA.facilities;
-    state.notifications = LIVE_DATA.notifications.length > 0 ? LIVE_DATA.notifications : DEMO_DATA.notifications;
+    currentEvents = (LIVE_DATA.events && LIVE_DATA.events.length > 0) ? LIVE_DATA.events : ((DEMO_DATA.events && DEMO_DATA.events.length > 0) ? DEMO_DATA.events : BUILTIN_DEMO_EVENTS);
+    currentFacilities = (LIVE_DATA.facilities && LIVE_DATA.facilities.length > 0) ? LIVE_DATA.facilities : DEMO_DATA.facilities;
+    state.notifications = (LIVE_DATA.notifications && LIVE_DATA.notifications.length > 0) ? LIVE_DATA.notifications : DEMO_DATA.notifications;
     updateDataSourceUI();
     if (state.currentPage === 'dashboard') {
       updateDashboardLiveView();
     }
   }
 
+  let startupFallbackTimer = null;
+
   function startPolling() {
     if (state.dataSource === 'live') {
       startLivePolling();
-      fetchLiveData(true).catch(() => {
-        activateFirmsUnavailable('FastAPI backend connection error');
+      if (startupFallbackTimer) clearTimeout(startupFallbackTimer);
+      // Fast startup guarantee: 4.5s max wait for live satellite feed before loading fallback
+      startupFallbackTimer = setTimeout(() => {
+        if (state.dataState === 'CONNECTING') {
+          console.warn('[ThermoSafe] Fast startup timeout (4.5s) reached. Activating graceful fallback.');
+          applyDemoFallbackState('Live backend connection pending (> 4.5s)', true);
+        }
+      }, 4500);
+
+      fetchLiveData(true).then(() => {
+        if (startupFallbackTimer) clearTimeout(startupFallbackTimer);
+      }).catch(() => {
+        if (startupFallbackTimer) clearTimeout(startupFallbackTimer);
+        applyDemoFallbackState('Backend unavailable — showing fallback data', true);
       });
     }
   }

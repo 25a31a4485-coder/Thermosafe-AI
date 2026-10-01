@@ -44,8 +44,14 @@ except Exception as e:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 1. Startup: Launch single resilient background FIRMS worker
+    # 1. Startup: Safe validation and launch single resilient background FIRMS worker
+    import logging
+    logger = logging.getLogger("main")
     firms_svc = get_firms_service()
+    if firms_svc.is_configured:
+        logger.info("NASA FIRMS API key: CONFIGURED")
+    else:
+        logger.warning("NASA FIRMS API key: NOT CONFIGURED")
     firms_svc.start_background_worker()
     yield
     # 2. Shutdown: Gracefully stop background worker
@@ -121,17 +127,23 @@ async def health_root():
 @app.get("/api/health", tags=["Health"])
 async def health_check():
     """
-    Health check endpoint returning service status and FIRMS worker telemetry.
-    Safe against internal exceptions.
+    Health check endpoint returning service status, timestamp, and FIRMS configuration state.
+    Safe against internal exceptions; never exposes secrets.
     """
+    from datetime import datetime, timezone
+    now_iso = datetime.now(timezone.utc).isoformat()
     res = {
         "status": "ok",
-        "service": "ThermoSafe AI backend"
+        "service": "thermosafe-ai",
+        "firmsConfigured": False,
+        "timestamp": now_iso
     }
     try:
         firms = get_firms_service()
+        res["firmsConfigured"] = bool(firms.is_configured)
         res["firms"] = firms.get_health_status()
     except Exception as exc:
+        res["firmsConfigured"] = False
         res["firms"] = {
             "firms_configured": False,
             "status": "UNAVAILABLE",

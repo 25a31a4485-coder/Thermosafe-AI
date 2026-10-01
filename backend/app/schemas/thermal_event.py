@@ -120,6 +120,66 @@ class ThermalEventResponse(BaseModel):
 
     @computed_field
     @property
+    def brightness(self) -> Optional[str]:
+        """Brightness / Radiative Power (MW)."""
+        return self.thermal_intensity or "N/A"
+
+    @computed_field
+    @property
+    def acquisitionDate(self) -> Optional[str]:
+        """Acquisition date (YYYY-MM-DD)."""
+        if self.detected_at:
+            return self.detected_at.strftime("%Y-%m-%d")
+        return None
+
+    @computed_field
+    @property
+    def acquisitionTime(self) -> Optional[str]:
+        """Acquisition time (HH:MM UTC)."""
+        if self.detected_at:
+            return self.detected_at.strftime("%H:%M UTC")
+        return None
+
+    @computed_field
+    @property
+    def satellite(self) -> str:
+        """Satellite sensor platform."""
+        ds = (self.data_source or "").lower()
+        if "noaa21" in ds:
+            return "NOAA-21 (JPSS-2)"
+        elif "noaa20" in ds:
+            return "NOAA-20 (JPSS-1)"
+        elif "snpp" in ds:
+            return "Suomi-NPP"
+        elif "modis" in ds:
+            return "Terra/Aqua (MODIS)"
+        return "VIIRS NOAA-21"
+
+    @computed_field
+    @property
+    def instrument(self) -> str:
+        """Sensor instrument."""
+        if "modis" in (self.data_source or "").lower():
+            return "MODIS"
+        return "VIIRS"
+
+    @computed_field
+    @property
+    def source(self) -> str:
+        """Originating telemetry source."""
+        return self.data_source or "NASA FIRMS"
+
+    @computed_field
+    @property
+    def location(self) -> str:
+        """Normalized geographical location description."""
+        if self.facility and self.facility.name:
+            return self.facility.name
+        return f"India ({self.latitude:.3f}°N, {self.longitude:.3f}°E)"
+
+
+    @computed_field
+    @property
     def industrial_natural_group(self) -> str:
         """Segregation group: INDUSTRIAL, NATURAL/FOREST, OTHER, UNKNOWN."""
         if self.classifications and len(self.classifications) > 0:
